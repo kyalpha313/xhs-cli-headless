@@ -536,13 +536,17 @@ def _generate_b1(fp: dict[str, Any]) -> str:
     latin1_str = ciphertext.decode("latin1")
     encoded = quote(latin1_str, safe="!'()*~._-")
 
-    # Parse URL-encoded bytes
+    # Parse URL-encoded bytes — walk character by character to avoid
+    # dropping leading ASCII chars that precede the first '%'.
     result_bytes = bytearray()
-    parts = encoded.split("%")[1:]  # skip first empty part
-    for part in parts:
-        result_bytes.append(int(part[:2], 16))
-        for ch in part[2:]:
-            result_bytes.append(ord(ch))
+    i = 0
+    while i < len(encoded):
+        if encoded[i] == "%" and i + 2 < len(encoded):
+            result_bytes.append(int(encoded[i + 1 : i + 3], 16))
+            i += 3
+        else:
+            result_bytes.append(ord(encoded[i]))
+            i += 1
 
     return _custom_base64_encode(bytes(result_bytes))
 
@@ -582,10 +586,11 @@ def build_get_uri(
     """Build URI with query parameters for GET requests."""
     if not params:
         return uri
+    from urllib.parse import quote
     parts = []
     for key, value in params.items():
         str_val = ",".join(value) if isinstance(value, list) else str(value)
-        encoded = str_val.replace("=", "%3D")
+        encoded = quote(str_val, safe="")
         parts.append(f"{key}={encoded}")
     return f"{uri}?{'&'.join(parts)}"
 

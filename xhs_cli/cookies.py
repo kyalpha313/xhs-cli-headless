@@ -60,42 +60,42 @@ def extract_browser_cookies(source: str = "chrome") -> dict[str, str] | None:
 
     Runs in a subprocess to avoid SQLite DB locks when the browser is running.
     """
-    extract_script = f'''
+    extract_script = '''
 import json, sys
 try:
     import browser_cookie3 as bc3
 except ImportError:
-    print(json.dumps({{"error": "browser-cookie3 not installed"}}))
+    print(json.dumps({"error": "browser-cookie3 not installed"}))
     sys.exit(0)
 
-browsers = {{
+browsers = {
     "chrome": bc3.chrome,
     "firefox": bc3.firefox,
     "edge": bc3.edge,
     "safari": bc3.safari,
     "brave": bc3.brave,
-}}
+}
 
-source = "{source}"
+source = sys.argv[1]
 loader = browsers.get(source)
 if not loader:
-    print(json.dumps({{"error": f"Unknown browser: {{source}}"}}))
+    print(json.dumps({"error": f"Unknown browser: {source}"}))
     sys.exit(0)
 
 try:
     cj = loader(domain_name=".xiaohongshu.com")
-    cookies = {{c.name: c.value for c in cj if "xiaohongshu.com" in (c.domain or "")}}
+    cookies = {c.name: c.value for c in cj if "xiaohongshu.com" in (c.domain or "")}
     if cookies.get("a1"):
-        print(json.dumps({{"browser": source, "cookies": cookies}}))
+        print(json.dumps({"browser": source, "cookies": cookies}))
     else:
-        print(json.dumps({{"error": "no_a1_cookie"}}))
+        print(json.dumps({"error": "no_a1_cookie"}))
 except Exception as e:
-    print(json.dumps({{"error": str(e)}}))
+    print(json.dumps({"error": str(e)}))
 '''
 
     try:
         result = subprocess.run(
-            [sys.executable, "-c", extract_script],
+            [sys.executable, "-c", extract_script, source],
             capture_output=True,
             text=True,
             timeout=15,

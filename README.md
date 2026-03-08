@@ -1,4 +1,4 @@
-# xhs-api-cli
+# xiaohongshu-cli
 
 小红书 CLI — 通过逆向 API 在终端操作小红书 📕
 
@@ -23,8 +23,8 @@
 
 ```bash
 # From source
-git clone git@github.com:jackwener/xhs-api-cli.git
-cd xhs-api-cli
+git clone git@github.com:jackwener/xiaohongshu-cli.git
+cd xiaohongshu-cli
 uv sync
 
 # Or: pip install
@@ -95,9 +95,9 @@ xhs notifications --type connections   # 新增关注 notifications
 
 ## Authentication
 
-xhs-api-cli uses a 2-tier authentication strategy:
+xiaohongshu-cli uses a 2-tier authentication strategy:
 
-1. **Saved cookies** — loads from `~/.xhs-api-cli/cookies.json`
+1. **Saved cookies** — loads from `~/.xiaohongshu-cli/cookies.json`
 2. **Browser cookies** — auto-extracts from Chrome, Firefox, Safari, Edge, Brave
 
 Cookies are validated on use. Most commands require authentication. Use `--cookie-source` to specify browser (default: chrome).

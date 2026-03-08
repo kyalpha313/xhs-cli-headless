@@ -40,7 +40,7 @@ class SignatureError(XhsApiError):
         super().__init__("Signature verification failed", code=300015)
 
 
-class NoCookieError(Exception):
+class NoCookieError(XhsApiError):
     """Raised when no valid cookies are found."""
 
     def __init__(self, source: str, details: str = ""):

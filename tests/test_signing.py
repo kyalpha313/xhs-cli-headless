@@ -163,7 +163,7 @@ class TestBuildUri:
 
     def test_with_list_params(self):
         result = build_get_uri("/api/test", {"types": ["a", "b"]})
-        assert "types=a,b" in result
+        assert "types=a%2Cb" in result
 
 
 class TestExtractUri:

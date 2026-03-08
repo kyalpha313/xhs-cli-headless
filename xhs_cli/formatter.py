@@ -7,13 +7,14 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-console = Console()
+console = Console(stderr=True)
 error_console = Console(stderr=True)
+_stdout = Console()
 
 
 def print_json(data: Any) -> None:
-    """Print raw JSON output."""
-    console.print_json(json.dumps(data, ensure_ascii=False, indent=2))
+    """Print raw JSON output to stdout."""
+    _stdout.print_json(json.dumps(data, ensure_ascii=False, indent=2))
 
 
 def print_error(message: str) -> None:
@@ -351,6 +352,34 @@ def render_creator_notes(data: Any) -> None:
         status = "✅" if note.get("status") in (None, 0, "published") else "⏳"
         note_id = note.get("note_id", note.get("id", ""))
         table.add_row(str(i), title, liked, comment_count, status, note_id)
+
+    console.print(table)
+
+
+def render_notifications(data: dict[str, Any], notif_type: str) -> None:
+    """Render notification messages."""
+    import time as _time
+
+    messages = data.get("message_list", []) if isinstance(data, dict) else []
+    if not messages:
+        print_info("No notifications")
+        return
+
+    table = Table(title=f"通知 — {notif_type}", show_lines=True)
+    table.add_column("#", style="dim", width=3)
+    table.add_column("用户", width=12)
+    table.add_column("内容", width=40)
+    table.add_column("时间", width=12)
+
+    for i, msg in enumerate(messages[:20], 1):
+        user = msg.get("user", {})
+        nickname = user.get("nickname", "")
+        title = msg.get("title", "")
+        content = msg.get("content", "")
+        display = f"{title}" + (f": {content[:30]}" if content else "")
+        ts = msg.get("time", 0)
+        time_str = _time.strftime("%m-%d %H:%M", _time.localtime(ts)) if ts else ""
+        table.add_row(str(i), nickname, display, time_str)
 
     console.print(table)
 

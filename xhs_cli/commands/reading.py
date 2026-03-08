@@ -2,8 +2,6 @@
 
 import click
 
-from ..client import XhsClient
-from ..cookies import get_cookies
 from ..exceptions import NoCookieError, XhsApiError
 from ..formatter import (
     console,
@@ -15,20 +13,14 @@ from ..formatter import (
     render_creator_notes,
     render_feed,
     render_note,
+    render_notifications,
     render_search_results,
     render_topics,
     render_user_info,
     render_user_posts,
     render_users,
 )
-
-
-def _get_client(ctx) -> XhsClient:
-    """Get an XhsClient from the click context."""
-    cookie_source = ctx.obj.get("cookie_source", "chrome") if ctx.obj else "chrome"
-    cookies = get_cookies(cookie_source)
-    return XhsClient(cookies)
-
+from ._common import get_client as _get_client
 
 # ─── Sort mapping ────────────────────────────────────────────────────────────
 
@@ -330,29 +322,7 @@ def notifications(ctx, notif_type: str, cursor: str, num: int, as_json: bool):
         if as_json:
             print_json(data)
         else:
-            messages = data.get("message_list", []) if isinstance(data, dict) else []
-            if not messages:
-                print_info("No notifications")
-            else:
-                from rich.table import Table
-                table = Table(title=f"通知 — {notif_type}", show_lines=True)
-                table.add_column("#", style="dim", width=3)
-                table.add_column("用户", width=12)
-                table.add_column("内容", width=40)
-                table.add_column("时间", width=12)
-
-                import time as _time
-                for i, msg in enumerate(messages[:20], 1):
-                    user = msg.get("user", {})
-                    nickname = user.get("nickname", "")
-                    title = msg.get("title", "")
-                    content = msg.get("content", "")
-                    display = f"{title}" + (f": {content[:30]}" if content else "")
-                    ts = msg.get("time", 0)
-                    time_str = _time.strftime("%m-%d %H:%M", _time.localtime(ts)) if ts else ""
-                    table.add_row(str(i), nickname, display, time_str)
-
-                console.print(table)
+            render_notifications(data, notif_type)
 
     except (NoCookieError, XhsApiError) as e:
         print_error(str(e))

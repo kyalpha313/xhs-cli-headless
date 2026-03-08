@@ -16,6 +16,6 @@ APP_ID = "xhs-pc-web"
 PLATFORM = "Windows"
 
 # Config directory
-CONFIG_DIR_NAME = ".xhs-api-cli"
+CONFIG_DIR_NAME = ".xiaohongshu-cli"
 COOKIE_FILE = "cookies.json"
 TOKEN_CACHE_FILE = "token_cache.json"

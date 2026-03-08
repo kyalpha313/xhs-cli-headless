@@ -105,10 +105,6 @@ class XhsClient:
             response=data,
         )
 
-    def _human_wait(self, min_sec: float = 0.5, max_sec: float = 2.0) -> None:
-        """Random delay to mimic human behavior."""
-        time.sleep(random.uniform(min_sec, max_sec))
-
     # ─── Main API Methods ──────────────────────────────────────────────────
 
     def _main_api_get(
@@ -504,19 +500,7 @@ class XhsClient:
         homefeed.household_product_v3 (家居), homefeed.gaming_v3 (游戏),
         homefeed.travel_v3 (旅行), homefeed.fitness_v3 (健身)
         """
-        return self._main_api_post("/api/sns/web/v1/homefeed", {
-            "cursor_score": "",
-            "num": 40,
-            "refresh_type": 1,
-            "note_index": 0,
-            "unread_begin_note_id": "",
-            "unread_end_note_id": "",
-            "unread_note_count": 0,
-            "category": category,
-            "search_key": "",
-            "need_num": 40,
-            "image_scenes": ["FD_PRV_WEBP", "FD_WM_WEBP"],
-        })
+        return self.get_home_feed(category=category)
 
     # ─── P1: User Content Lists ───────────────────────────────────────────
 
@@ -579,9 +563,8 @@ class XhsClient:
         if not match:
             raise XhsApiError("Could not parse __INITIAL_STATE__ from HTML")
 
-        # Replace bare `undefined` values
-        state_str = re.sub(r':\s*undefined', ':"\"\"', match.group(1))
-        state_str = re.sub(r',\s*undefined', ',""', state_str)
+        # Replace bare `undefined` values with JSON null
+        state_str = re.sub(r'\bundefined\b', 'null', match.group(1))
         state = json.loads(state_str)
 
         detail_map = state.get("note", {}).get("noteDetailMap", {})

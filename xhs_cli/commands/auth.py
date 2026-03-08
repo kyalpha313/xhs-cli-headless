@@ -9,10 +9,11 @@ from ..formatter import console, print_error, print_json, print_success, render_
 
 
 @click.command()
-@click.option("--cookie-source", default="chrome", help="Browser to read cookies from (chrome, safari, firefox)")
 @click.option("--json", "as_json", is_flag=True, help="Output as JSON")
-def login(cookie_source: str, as_json: bool):
+@click.pass_context
+def login(ctx, as_json: bool):
     """Log in by extracting cookies from browser."""
+    cookie_source = ctx.obj.get("cookie_source", "chrome") if ctx.obj else "chrome"
     try:
         cookies = get_cookies(cookie_source)
         print_success(f"Cookies extracted from {cookie_source}")

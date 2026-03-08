@@ -2,16 +2,9 @@
 
 import click
 
-from ..client import XhsClient
-from ..cookies import get_cookies
 from ..exceptions import NoCookieError, XhsApiError
 from ..formatter import print_error, print_info, print_json, print_success
-
-
-def _get_client(ctx) -> XhsClient:
-    cookie_source = ctx.obj.get("cookie_source", "chrome") if ctx.obj else "chrome"
-    cookies = get_cookies(cookie_source)
-    return XhsClient(cookies)
+from ._common import get_client as _get_client
 
 
 @click.command()

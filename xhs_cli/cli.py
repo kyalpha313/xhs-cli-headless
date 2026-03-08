@@ -1,4 +1,4 @@
-"""CLI entry point for xhs-api-cli.
+"""CLI entry point for xiaohongshu-cli.
 
 Usage:
     xhs login / status / logout
