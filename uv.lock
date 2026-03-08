@@ -649,7 +649,7 @@ wheels = [
 ]
 
 [[package]]
-name = "xhs-api-cli"
+name = "xiaohongshu-cli"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
