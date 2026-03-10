@@ -18,6 +18,7 @@
 - ✍️ **Creator** — post image notes, delete notes, my-notes list
 - 🔔 **Notifications** — unread count, mentions, likes, new followers
 - 📊 **Structured output** — commands support `--yaml` and `--json`; non-TTY stdout defaults to YAML
+- 📦 **Stable envelope** — see [SCHEMA.md](./SCHEMA.md) for `ok/schema_version/data/error`
 
 ## Installation
 
@@ -38,7 +39,7 @@ pip install -e .
 xhs login                             # Extract cookies from browser
 xhs status                            # Check login status
 xhs whoami                            # Detailed profile (fans, likes, etc)
-xhs whoami --json                     # Raw JSON
+xhs whoami --json                     # Structured JSON envelope
 xhs logout                            # Clear saved cookies
 
 # ─── Search ───────────────────────────────────────
