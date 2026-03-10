@@ -69,9 +69,10 @@ xhs topics "美食"                      # Search hashtags/topics
 # ─── Reading ──────────────────────────────────────
 xhs read <note_id>                     # Read a note
 xhs read "https://www.xiaohongshu.com/explore/xxx?xsec_token=yyy"  # Read by URL (auto-extracts xsec_token)
-xhs comments <note_id>                 # View comments (first page)
-xhs comments <note_id> --all           # Fetch ALL comments (auto-paginate)
-xhs comments "<url>" --all --json      # All comments from URL, as JSON
+xhs comments "<url>"                   # View comments — paste URL to auto-extract xsec_token
+xhs comments "<url>" --all             # Fetch ALL comments (auto-paginate all pages)
+xhs comments "<url>" --all --json      # All comments as JSON
+xhs comments <note_id> --xsec-token T  # Use note_id + explicit xsec_token
 xhs sub-comments <note_id> <cmt_id>   # View replies to a comment
 xhs user <user_id>                     # User profile
 xhs user-posts <user_id>              # User's published notes
@@ -319,9 +320,10 @@ xhs topics "美食"                      # 搜索话题
 # 阅读
 xhs read <note_id>                     # 阅读笔记
 xhs read "https://...?xsec_token=..."  # 粘贴网页 URL 直接阅读（自动提取 token）
-xhs comments <note_id>                 # 查看评论（第一页）
-xhs comments <note_id> --all           # 获取所有评论（自动翻页）
-xhs comments "<url>" --all --json      # 从 URL 获取全部评论，JSON 格式
+xhs comments "<url>"                   # 查看评论 — 粘贴 URL 自动提取 xsec_token
+xhs comments "<url>" --all             # 获取全部评论（自动翻页）
+xhs comments "<url>" --all --json      # 全部评论，JSON 格式
+xhs comments <note_id> --xsec-token T  # 用 note_id + 显式 xsec_token
 xhs sub-comments <note_id> <cmt_id>   # 查看评论的回复
 xhs user <user_id>                     # 用户主页
 xhs user-posts <user_id>              # 用户发布的笔记
