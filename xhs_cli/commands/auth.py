@@ -7,11 +7,26 @@ from ..cookies import clear_cookies, get_cookies
 from ..exceptions import NoCookieError, XhsApiError
 from ..formatter import (
     console,
+    error_payload,
     maybe_print_structured,
     print_error,
     print_success,
     render_user_info,
+    success_payload,
 )
+
+
+def _xhs_user_payload(info: dict) -> dict[str, object]:
+    """Normalize Xiaohongshu user info for structured agent output."""
+    return {
+        "id": info.get("user_id") or info.get("userid") or info.get("red_id") or "",
+        "name": info.get("nickname", "Unknown"),
+        "username": info.get("red_id", ""),
+        "nickname": info.get("nickname", "Unknown"),
+        "red_id": info.get("red_id", ""),
+        "ip_location": info.get("ip_location", ""),
+        "desc": info.get("desc", ""),
+    }
 
 
 @click.command()
@@ -54,7 +69,11 @@ def status(ctx, as_json: bool, as_yaml: bool):
         with XhsClient(cookies) as client:
             info = client.get_self_info()
 
-        if not maybe_print_structured(info, as_json=as_json, as_yaml=as_yaml):
+        if not maybe_print_structured(
+            success_payload({"authenticated": True, "user": _xhs_user_payload(info)}),
+            as_json=as_json,
+            as_yaml=as_yaml,
+        ):
             nickname = info.get("nickname", "Unknown")
             red_id = info.get("red_id", "")
             ip_location = info.get("ip_location", "")
@@ -70,9 +89,21 @@ def status(ctx, as_json: bool, as_yaml: bool):
                 console.print(f"  简介: {desc}")
 
     except NoCookieError:
+        if maybe_print_structured(
+            error_payload("not_authenticated", "Not logged in. Run: xhs login"),
+            as_json=as_json,
+            as_yaml=as_yaml,
+        ):
+            raise SystemExit(1) from None
         print_error("Not logged in. Run: xhs login")
         raise SystemExit(1) from None
     except XhsApiError as e:
+        if maybe_print_structured(
+            error_payload("api_error", f"Status check failed: {e}"),
+            as_json=as_json,
+            as_yaml=as_yaml,
+        ):
+            raise SystemExit(1) from None
         print_error(f"Status check failed: {e}")
         raise SystemExit(1) from None
 
@@ -96,12 +127,28 @@ def whoami(ctx, as_json: bool, as_yaml: bool):
         with XhsClient(cookies) as client:
             info = client.get_self_info()
 
-        if not maybe_print_structured(info, as_json=as_json, as_yaml=as_yaml):
+        if not maybe_print_structured(
+            success_payload({"user": _xhs_user_payload(info)}),
+            as_json=as_json,
+            as_yaml=as_yaml,
+        ):
             render_user_info(info)
 
     except NoCookieError:
+        if maybe_print_structured(
+            error_payload("not_authenticated", "Not logged in. Run: xhs login"),
+            as_json=as_json,
+            as_yaml=as_yaml,
+        ):
+            raise SystemExit(1) from None
         print_error("Not logged in. Run: xhs login")
         raise SystemExit(1) from None
     except XhsApiError as e:
+        if maybe_print_structured(
+            error_payload("api_error", f"Failed to get profile: {e}"),
+            as_json=as_json,
+            as_yaml=as_yaml,
+        ):
+            raise SystemExit(1) from None
         print_error(f"Failed to get profile: {e}")
         raise SystemExit(1) from None

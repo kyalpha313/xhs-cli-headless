@@ -15,6 +15,7 @@ console = Console(stderr=True)
 error_console = Console(stderr=True)
 _stdout = Console()
 _OUTPUT_ENV = "OUTPUT"
+_SCHEMA_VERSION = "1"
 
 
 def resolve_output_format(*, as_json: bool, as_yaml: bool) -> str | None:
@@ -66,6 +67,30 @@ def maybe_print_structured(data: Any, *, as_json: bool, as_yaml: bool) -> bool:
     else:
         print_yaml(data)
     return True
+
+
+def success_payload(data: Any) -> dict[str, Any]:
+    """Wrap structured success data in the shared agent schema."""
+    return {
+        "ok": True,
+        "schema_version": _SCHEMA_VERSION,
+        "data": data,
+    }
+
+
+def error_payload(code: str, message: str, *, details: Any | None = None) -> dict[str, Any]:
+    """Wrap structured error data in the shared agent schema."""
+    error = {
+        "code": code,
+        "message": message,
+    }
+    if details is not None:
+        error["details"] = details
+    return {
+        "ok": False,
+        "schema_version": _SCHEMA_VERSION,
+        "error": error,
+    }
 
 
 def print_error(message: str) -> None:

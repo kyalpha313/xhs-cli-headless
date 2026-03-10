@@ -99,4 +99,33 @@ class TestCliBasic:
 
         assert result.exit_code == 0
         payload = yaml.safe_load(result.output)
-        assert payload["nickname"] == "Alice"
+        assert payload["ok"] is True
+        assert payload["schema_version"] == "1"
+        assert payload["data"]["authenticated"] is True
+        assert payload["data"]["user"]["name"] == "Alice"
+
+    def test_whoami_auto_yaml_when_stdout_is_not_tty(self, monkeypatch):
+        monkeypatch.setenv("OUTPUT", "auto")
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def get_self_info(self):
+                return {"nickname": "Alice", "red_id": "alice001", "user_id": "u-1"}
+
+        monkeypatch.setattr("xhs_cli.commands.auth.get_cookies", lambda source: {"a1": "cookie"})
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(cli, ["whoami"])
+
+        assert result.exit_code == 0
+        payload = yaml.safe_load(result.output)
+        assert payload["ok"] is True
+        assert payload["data"]["user"]["username"] == "alice001"
