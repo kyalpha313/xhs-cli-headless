@@ -113,6 +113,8 @@ Payloads live under `.data`.
 | `xhs follow <user_id>` | Follow a user | `xhs follow 5f2e123` |
 | `xhs unfollow <user_id>` | Unfollow a user | `xhs unfollow 5f2e123` |
 | `xhs favorites [user_id]` | List bookmarked notes (defaults to self) | `xhs favorites --json` |
+| `xhs following [user_id]` | List following (defaults to self) | `xhs following --all --json` |
+| `xhs followers [user_id]` | List followers (defaults to self) | `xhs followers --all --json` |
 
 ### Creator
 
@@ -208,7 +210,6 @@ Structured error codes returned in the `error.code` field:
 - **No video download** — cannot download note images/videos
 - **No DMs** — cannot access private messages
 - **No live streaming** — live features not supported
-- **No following/followers list** — XHS web API doesn't expose these endpoints
 - **Single account** — one set of cookies at a time
 - **Rate limited** — built-in Gaussian jitter delay (~1-1.5s) between requests; aggressive usage may trigger captchas or IP blocks
 

@@ -87,6 +87,10 @@ xhs hot -c fashion                    # Categories: fashion, food, cosmetics,
 # ─── Social ───────────────────────────────────────
 xhs favorites                          # My bookmarked notes (current user)
 xhs favorites <user_id>                # Other user's bookmarked notes
+xhs following                          # My following list
+xhs following <user_id> --all          # All following (auto-paginate)
+xhs followers                          # My followers list
+xhs followers <user_id> --all          # All followers (auto-paginate)
 xhs follow <user_id>                   # Follow a user
 xhs unfollow <user_id>                 # Unfollow a user
 
@@ -335,6 +339,10 @@ xhs hot -c travel                     # 分类: fashion, food, cosmetics, movie,
 # 社交
 xhs favorites                          # 我的收藏（自动识别当前用户）
 xhs favorites <user_id>                # 其他用户的收藏
+xhs following                          # 我的关注列表
+xhs following <user_id> --all          # 全部关注（自动翻页）
+xhs followers                          # 我的粉丝列表
+xhs followers <user_id> --all          # 全部粉丝（自动翻页）
 xhs follow <user_id>                   # 关注
 xhs unfollow <user_id>                 # 取消关注
 

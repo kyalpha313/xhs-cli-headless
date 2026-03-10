@@ -638,6 +638,22 @@ class XhsClient:
             "target_user_id": user_id,
         })
 
+    def get_user_followers(self, user_id: str, cursor: str = "") -> dict[str, Any]:
+        """Get a user's followers list (fans_page endpoint)."""
+        return self._main_api_get("/api/sns/web/v1/user/fans_page", {
+            "user_id": user_id,
+            "cursor": cursor,
+            "num": 30,
+        })
+
+    def get_user_following(self, user_id: str, cursor: str = "") -> dict[str, Any]:
+        """Get a user's following list (following_page endpoint)."""
+        return self._main_api_get("/api/sns/web/v1/user/following_page", {
+            "user_id": user_id,
+            "cursor": cursor,
+            "num": 30,
+        })
+
     # ─── P1: Discovery Endpoints ──────────────────────────────────────────
 
     def get_hot_feed(self, category: str = "homefeed.fashion_v3") -> dict[str, Any]:

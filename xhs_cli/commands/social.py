@@ -70,3 +70,109 @@ def favorites(ctx, user_id: str | None, cursor: str, as_json: bool, as_yaml: boo
     except Exception as exc:
         exit_for_error(exc, as_json=as_json, as_yaml=as_yaml)
 
+
+@click.command()
+@click.argument("user_id", required=False, default=None)
+@click.option("--cursor", default="", help="Pagination cursor")
+@click.option("--all", "fetch_all", is_flag=True, help="Auto-paginate to fetch all")
+@structured_output_options
+@click.pass_context
+def following(ctx, user_id: str | None, cursor: str, fetch_all: bool, as_json: bool, as_yaml: bool):
+    """List users that someone is following. Defaults to current user."""
+    try:
+        uid = _resolve_user_id(ctx, user_id)
+
+        if fetch_all:
+            all_users: list[dict] = []
+            cur = cursor
+            while True:
+                data = run_client_action(ctx, lambda client, c=cur: client.get_user_following(uid, cursor=c))
+                users = data.get("users", []) if isinstance(data, dict) else []
+                all_users.extend(users)
+                has_more = data.get("has_more", False) if isinstance(data, dict) else False
+                cur = data.get("cursor", "") if isinstance(data, dict) else ""
+                if not has_more or not cur:
+                    break
+            data = {"users": all_users, "has_more": False, "total_fetched": len(all_users)}
+
+        else:
+            data = run_client_action(ctx, lambda client: client.get_user_following(uid, cursor=cursor))
+
+        if not maybe_print_structured(data, as_json=as_json, as_yaml=as_yaml):
+            users = data.get("users", []) if isinstance(data, dict) else []
+            if not users:
+                print_info("No following found.")
+            else:
+                from rich.table import Table
+                from rich.console import Console
+                console = Console()
+                table = Table(title="Following")
+                table.add_column("User ID", style="dim")
+                table.add_column("Nickname")
+                table.add_column("Description", max_width=40)
+                for u in users:
+                    table.add_row(
+                        u.get("user_id", ""),
+                        u.get("nickname", ""),
+                        (u.get("desc", "") or "")[:40],
+                    )
+                console.print(table)
+            if isinstance(data, dict) and data.get("has_more"):
+                print_info(f"More results — use --cursor {data.get('cursor', '')}")
+
+    except Exception as exc:
+        exit_for_error(exc, as_json=as_json, as_yaml=as_yaml)
+
+
+@click.command()
+@click.argument("user_id", required=False, default=None)
+@click.option("--cursor", default="", help="Pagination cursor")
+@click.option("--all", "fetch_all", is_flag=True, help="Auto-paginate to fetch all")
+@structured_output_options
+@click.pass_context
+def followers(ctx, user_id: str | None, cursor: str, fetch_all: bool, as_json: bool, as_yaml: bool):
+    """List a user's followers. Defaults to current user."""
+    try:
+        uid = _resolve_user_id(ctx, user_id)
+
+        if fetch_all:
+            all_users: list[dict] = []
+            cur = cursor
+            while True:
+                data = run_client_action(ctx, lambda client, c=cur: client.get_user_followers(uid, cursor=c))
+                users = data.get("users", []) if isinstance(data, dict) else []
+                all_users.extend(users)
+                has_more = data.get("has_more", False) if isinstance(data, dict) else False
+                cur = data.get("cursor", "") if isinstance(data, dict) else ""
+                if not has_more or not cur:
+                    break
+            data = {"users": all_users, "has_more": False, "total_fetched": len(all_users)}
+
+        else:
+            data = run_client_action(ctx, lambda client: client.get_user_followers(uid, cursor=cursor))
+
+        if not maybe_print_structured(data, as_json=as_json, as_yaml=as_yaml):
+            users = data.get("users", []) if isinstance(data, dict) else []
+            if not users:
+                print_info("No followers found.")
+            else:
+                from rich.table import Table
+                from rich.console import Console
+                console = Console()
+                table = Table(title="Followers")
+                table.add_column("User ID", style="dim")
+                table.add_column("Nickname")
+                table.add_column("Description", max_width=40)
+                for u in users:
+                    table.add_row(
+                        u.get("user_id", ""),
+                        u.get("nickname", ""),
+                        (u.get("desc", "") or "")[:40],
+                    )
+                console.print(table)
+            if isinstance(data, dict) and data.get("has_more"):
+                print_info(f"More results — use --cursor {data.get('cursor', '')}")
+
+    except Exception as exc:
+        exit_for_error(exc, as_json=as_json, as_yaml=as_yaml)
+
