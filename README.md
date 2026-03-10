@@ -1,35 +1,51 @@
 # xiaohongshu-cli
 
-小红书 CLI — 通过逆向 API 在终端操作小红书 📕
+[![CI](https://github.com/jackwener/xiaohongshu-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/jackwener/xiaohongshu-cli/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue.svg)](https://pypi.org/project/xiaohongshu-cli/)
 
-## 推荐项目
+A CLI for Xiaohongshu (小红书) — search, read, interact, and post via reverse-engineered API 📕
 
-- [bilibili-cli](https://github.com/jackwener/bilibili-cli) — Bilibili CLI
-- [twitter-cli](https://github.com/jackwener/twitter-cli) — Twitter/X CLI
+[English](#features) | [中文](#功能特性)
+
+## More Tools
+
+- [bilibili-cli](https://github.com/jackwener/bilibili-cli) — Bilibili CLI for videos, users, search, and feeds
+- [twitter-cli](https://github.com/jackwener/twitter-cli) — Twitter/X CLI for timelines, bookmarks, and posting
+- [discord-cli](https://github.com/jackwener/discord-cli) — Discord CLI for local-first sync, search, and export
+- [tg-cli](https://github.com/jackwener/tg-cli) — Telegram CLI for local-first sync, search, and export
 
 ## Features
 
-- 🔐 **Auth** — auto-extract browser cookies, status, whoami
+- 🔐 **Auth** — auto-extract browser cookies, status check, whoami
 - 🔍 **Search** — notes by keyword, user search, topic search
 - 📖 **Reading** — note detail, comments, sub-comments, user profiles
 - 📰 **Feed** — recommendation feed, hot/trending by category
 - 👥 **Social** — follow/unfollow, favorites
 - 👍 **Interactions** — like, favorite, comment, reply, delete
-- ✍️ **Creator** — post image notes, my-notes list, experimental delete
+- ✍️ **Creator** — post image notes, my-notes list, delete
 - 🔔 **Notifications** — unread count, mentions, likes, new followers
+- 🛡️ **Anti-detection** — `sec-ch-ua` headers, request delay, auto-retry with exponential backoff
 - 📊 **Structured output** — commands support `--yaml` and `--json`; non-TTY stdout defaults to YAML
 - 📦 **Stable envelope** — see [SCHEMA.md](./SCHEMA.md) for `ok/schema_version/data/error`
+
+> **AI Agent Tip:** Prefer `--yaml` for structured output unless strict JSON is required. Non-TTY stdout defaults to YAML automatically.
 
 ## Installation
 
 ```bash
-# From source
+# Recommended: uv tool (fast, isolated)
+uv tool install xiaohongshu-cli
+
+# Or: pipx
+pipx install xiaohongshu-cli
+```
+
+From source:
+
+```bash
 git clone git@github.com:jackwener/xiaohongshu-cli.git
 cd xiaohongshu-cli
 uv sync
-
-# Or: pip install
-pip install -e .
 ```
 
 ## Usage
@@ -41,7 +57,6 @@ xhs status                            # Check login status
 xhs whoami                            # Detailed profile (fans, likes, etc)
 xhs whoami --json                     # Structured JSON envelope
 xhs logout                            # Clear saved cookies
-xhs logout --yaml                     # Structured success envelope
 
 # ─── Search ───────────────────────────────────────
 xhs search "美食"                      # Search notes
@@ -85,7 +100,7 @@ xhs delete-comment <note_id> <cmt_id> # Delete own comment
 xhs my-notes                           # List own notes (v2 creator endpoint)
 xhs my-notes --page 1                 # Next page
 xhs post --title "标题" --body "正文" --images img.jpg  # Post note
-xhs delete <note_id>                   # Experimental: delete note
+xhs delete <note_id>                   # Delete note
 xhs delete <note_id> -y               # Skip confirmation
 
 # ─── Notifications ────────────────────────────────
@@ -116,7 +131,6 @@ Saved cookies are valid for **7 days** by default. After that, the client automa
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OUTPUT` | `auto` | Output format: `json`, `yaml`, `rich`, or `auto` (→ YAML when non-TTY) |
-| `XHS_COOKIE_SOURCE` | `chrome` | Default browser for cookie extraction |
 
 ## Rate Limiting & Anti-Detection
 
@@ -127,18 +141,61 @@ xiaohongshu-cli includes built-in rate-limit protection and anti-detection:
 - **Browser fingerprint**: Sends `sec-ch-ua`, `sec-fetch-*`, and `accept-language` headers matching Edge 142
 - **Signed requests**: All API calls use `x-s` / `x-t` signatures (reverse-engineered from web client)
 
-## AI Agent Integration
+## Structured Output
 
-All commands support `--json` and `--yaml` flags for structured output. When `stdout` is not a TTY (e.g., piped to another program or invoked by an AI agent), output defaults to YAML.
-
-Output follows a stable envelope schema ([SCHEMA.md](./SCHEMA.md)):
+All `--json` / `--yaml` output uses the shared envelope from [SCHEMA.md](./SCHEMA.md):
 ```yaml
 ok: true
 schema_version: "1"
 data: { ... }
 ```
 
-See `.agent/skills/SKILL.md` for AI agent usage instructions.
+When stdout is not a TTY (e.g., piped or invoked by an AI agent), output defaults to YAML.
+Use `OUTPUT=yaml|json|rich|auto` to override.
+
+## Use as AI Agent Skill
+
+xiaohongshu-cli ships with a [`SKILL.md`](./SKILL.md) that teaches AI agents how to use it.
+
+### Claude Code / Antigravity
+
+```bash
+# Clone into your project's skills directory
+mkdir -p .agents/skills
+git clone git@github.com:jackwener/xiaohongshu-cli.git .agents/skills/xiaohongshu-cli
+
+# Or just copy the SKILL.md
+curl -o .agents/skills/xiaohongshu-cli/SKILL.md \
+  https://raw.githubusercontent.com/jackwener/xiaohongshu-cli/main/SKILL.md
+```
+
+### OpenClaw / ClawHub
+
+```bash
+clawhub install xiaohongshu-cli
+```
+
+## Project Structure
+
+```text
+xhs_cli/
+├── __init__.py
+├── cli.py           # Click entry point
+├── client.py        # XHS API client (signing, retry, rate-limit)
+├── cookies.py       # Cookie extraction & TTL management
+├── signing.py       # Main API signature generation
+├── creator_signing.py  # Creator API signature generation
+├── constants.py     # URLs, User-Agent, SDK version
+├── exceptions.py    # Structured exception hierarchy
+├── formatter.py     # Output formatting & schema envelope
+└── commands/
+    ├── _common.py   # Shared CLI helpers
+    ├── auth.py      # login/logout/status/whoami
+    ├── reading.py   # search/read/comments/user
+    ├── interactions.py  # like/favorite/comment/reply
+    ├── creator.py   # post/my-notes/delete
+    └── notifications.py  # unread/notifications
+```
 
 ## Development
 
@@ -185,6 +242,124 @@ Your cookies have expired. Run `xhs login` to refresh.
 **Q: Requests are slow**
 
 The built-in rate-limit delay (1s between requests) is intentional to avoid triggering XHS's anti-scraping. You can reduce it at your own risk by passing a shorter timeout in code, but this may lead to IP blocks.
+
+---
+
+## 推荐项目
+
+- [bilibili-cli](https://github.com/jackwener/bilibili-cli) — Bilibili 视频、用户、搜索与动态 CLI
+- [twitter-cli](https://github.com/jackwener/twitter-cli) — Twitter/X 时间线、书签和发推 CLI
+- [discord-cli](https://github.com/jackwener/discord-cli) — Discord 本地优先同步、检索与导出 CLI
+- [tg-cli](https://github.com/jackwener/tg-cli) — Telegram 本地优先同步、检索与导出 CLI
+
+## 功能特性
+
+- 🔐 **认证** — 自动提取浏览器 Cookie，状态检查，用户信息
+- 🔍 **搜索** — 按关键词搜索笔记、用户、话题
+- 📖 **阅读** — 笔记详情、评论、子评论、用户主页
+- 📰 **发现** — 推荐 Feed、按分类浏览热门
+- 👥 **社交** — 关注/取关、收藏夹
+- 👍 **互动** — 点赞、收藏、评论、回复、删除
+- ✍️ **创作者** — 发布图文笔记、我的笔记列表、删除
+- 🔔 **通知** — 未读数、@、点赞、新关注
+- 🛡️ **反风控** — `sec-ch-ua` 请求头、请求间隔控制、指数退避自动重试
+- 📊 **结构化输出** — `--yaml` / `--json`，非 TTY 默认输出 YAML
+- 📦 **稳定 envelope** — 参见 [SCHEMA.md](./SCHEMA.md)
+
+## 安装
+
+```bash
+# 推荐：uv tool（快速、隔离环境）
+uv tool install xiaohongshu-cli
+
+# 或者：pipx
+pipx install xiaohongshu-cli
+```
+
+从源码安装：
+
+```bash
+git clone git@github.com:jackwener/xiaohongshu-cli.git
+cd xiaohongshu-cli
+uv sync
+```
+
+## 使用示例
+
+```bash
+# 认证
+xhs login                             # 从浏览器提取 Cookie
+xhs status                            # 检查登录状态
+xhs whoami                            # 查看用户资料
+xhs logout                            # 清除缓存的 Cookie
+
+# 搜索
+xhs search "美食"                      # 搜索笔记
+xhs search "旅行" --sort popular       # 排序：general, popular, latest
+xhs search-user "用户名"               # 搜索用户
+xhs topics "美食"                      # 搜索话题
+
+# 阅读
+xhs read <note_id>                     # 阅读笔记
+xhs comments <note_id>                 # 查看评论
+xhs user <user_id>                     # 用户主页
+xhs user-posts <user_id>              # 用户发布的笔记
+
+# 发现
+xhs feed                              # 推荐 Feed
+xhs hot -c food                       # 热门笔记（按分类）
+
+# 互动
+xhs like <note_id>                     # 点赞
+xhs favorite <note_id>                 # 收藏
+xhs comment <note_id> -c "好赞！"      # 评论
+xhs follow <user_id>                   # 关注
+
+# 创作者
+xhs my-notes                           # 我的笔记列表
+xhs post --title "标题" --body "正文" --images img.jpg  # 发布笔记
+xhs delete <note_id>                   # 删除笔记
+
+# 通知
+xhs unread                             # 未读数
+xhs notifications --type likes         # 点赞通知
+```
+
+## 认证策略
+
+xiaohongshu-cli 采用两级认证策略：
+
+1. **已保存 Cookie** — 从 `~/.xiaohongshu-cli/cookies.json` 加载
+2. **浏览器 Cookie** — 自动从 Chrome、Firefox、Safari、Edge、Brave 提取
+
+Cookie 保存后有效期 **7 天**，超时后自动尝试从浏览器刷新。
+
+`xhs login` 会强制从浏览器重新提取并覆盖本地缓存。其他需认证命令在 session 过期时会自动重试一次。
+
+## 常见问题
+
+- `NoCookieError: No 'a1' cookie found` — 请先在 Chrome/Edge 打开 https://www.xiaohongshu.com/ 并登录，然后执行 `xhs login`
+- `NeedVerifyError` — 触发了验证码，请到浏览器中完成验证后重试
+- `IpBlockedError` — IP 被限制，尝试切换网络（手机热点或 VPN）
+- `SessionExpiredError` — Cookie 过期，执行 `xhs login` 刷新
+- 请求较慢是正常的 — 内置 1 秒请求间隔是为了避免触发反爬
+
+## 作为 AI Agent Skill 使用
+
+xiaohongshu-cli 自带 [`SKILL.md`](./SKILL.md)，让 AI Agent 能自动学习并使用本工具。
+
+### Claude Code / Antigravity
+
+```bash
+mkdir -p .agents/skills
+git clone git@github.com:jackwener/xiaohongshu-cli.git .agents/skills/xiaohongshu-cli
+```
+
+### OpenClaw / ClawHub
+
+```bash
+clawhub install xiaohongshu-cli
+```
 
 ## License
 

@@ -20,17 +20,48 @@ tags:
 ## Setup
 
 ```bash
-pip install xiaohongshu-cli   # or: uv pip install xiaohongshu-cli
+# Install (requires Python 3.10+)
+uv tool install xiaohongshu-cli
+# Or: pipx install xiaohongshu-cli
 ```
 
-No explicit login needed — cookies are auto-extracted from Chrome.
-Use `--cookie-source firefox` (or `edge`, `safari`, `brave`) to switch browser source.
+## Authentication
+
+**IMPORTANT FOR AGENTS**: Before executing ANY xhs command, check if credentials exist first. Do NOT assume cookies are configured.
+
+### Step 0: Check if already authenticated
+
+```bash
+xhs status --yaml >/dev/null && echo "AUTH_OK" || echo "AUTH_NEEDED"
+```
+
+If `AUTH_OK`, skip to [Command Reference](#command-reference).
+If `AUTH_NEEDED`, proceed to Step 1.
+
+### Step 1: Guide user to authenticate
+
+Ensure user is logged into xiaohongshu.com in one of: Chrome, Edge, Firefox, Safari, Brave. Then:
+
+```bash
+xhs login                              # auto-extract cookies
+xhs login --cookie-source firefox      # specify browser
+```
 
 Verify with:
 
 ```bash
 xhs status
+xhs whoami
 ```
+
+### Step 2: Handle common auth issues
+
+| Symptom | Agent action |
+|---------|-------------|
+| `NoCookieError: No 'a1' cookie found` | Guide user to login to xiaohongshu.com in browser |
+| `NeedVerifyError: Captcha required` | Ask user to open browser, complete captcha, then retry |
+| `IpBlockedError: IP blocked` | Suggest switching network (hotspot/VPN) |
+| `SessionExpiredError` | Run `xhs login` to refresh cookies |
 
 ## Agent Defaults
 
@@ -42,7 +73,7 @@ Payloads live under `.data`.
 - `OUTPUT=json` env → global override
 - `OUTPUT=rich` env → force human output
 
-## Commands
+## Command Reference
 
 ### Reading
 
@@ -128,6 +159,17 @@ xhs unread --json | jq '.data'
 xhs notifications --type mentions --json | jq '.data.message_list[:5]'
 ```
 
+### Daily reading workflow
+
+```bash
+# Browse recommendation feed
+xhs feed --yaml
+
+# Browse trending by category
+xhs hot -c food --yaml
+xhs hot -c travel --yaml
+```
+
 ## Hot Categories
 
 Available for `xhs hot -c <category>`:
@@ -142,3 +184,19 @@ Structured error codes returned in the `error.code` field:
 - `signature_error` — request signing failed
 - `api_error` — upstream API error
 - `unsupported_operation` — operation not available
+
+## Limitations
+
+- **No video download** — cannot download note images/videos
+- **No DMs** — cannot access private messages
+- **No live streaming** — live features not supported
+- **Single account** — one set of cookies at a time
+- **Rate limited** — built-in 1s delay between requests; aggressive usage may trigger IP blocks
+
+## Safety Notes
+
+- Do not ask users to share raw cookie values in chat logs.
+- Prefer local browser cookie extraction over manual secret copy/paste.
+- If auth fails, ask the user to re-login via `xhs login`.
+- Agent should treat cookie values as secrets (do not echo to stdout unnecessarily).
+- Built-in rate-limit delay protects accounts; do not bypass it.
