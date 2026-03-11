@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import subprocess
@@ -63,13 +64,14 @@ def clear_cookies() -> None:
         logger.debug("Cleared cookies from %s", cookie_path)
 
 
-def _available_browsers() -> list[str]:
-    """List all browser names supported by browser_cookie3."""
+@functools.lru_cache(maxsize=1)
+def _available_browsers() -> tuple[str, ...]:
+    """List all browser names supported by browser_cookie3 (cached)."""
     import inspect
 
     import browser_cookie3 as bc3
 
-    return sorted(
+    return tuple(sorted(
         name
         for name in dir(bc3)
         if not name.startswith("_")
@@ -77,7 +79,7 @@ def _available_browsers() -> list[str]:
         and callable(getattr(bc3, name))
         and hasattr(getattr(bc3, name), "__code__")
         and "domain_name" in inspect.signature(getattr(bc3, name)).parameters
-    )
+    ))
 
 
 def _get_browser_loader(source: str):
