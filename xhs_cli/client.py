@@ -353,7 +353,17 @@ class XhsClient:
         xsec_token: str = "",
         xsec_source: str = "pc_feed",
     ) -> Any:
-        """Get note details by ID."""
+        """Get note details by ID.
+
+        When xsec_token is empty, falls back to HTML page extraction
+        to avoid triggering captcha (the feed API requires xsec_token).
+        """
+        if not xsec_token:
+            logger.info("No xsec_token for note %s, falling back to HTML extraction", note_id)
+            note_data = self.get_note_from_html(note_id)
+            # Wrap to match API response structure: {items: [{id, note_card}]}
+            return {"items": [{"id": note_id, "note_card": note_data}]}
+
         return self._main_api_post("/api/sns/web/v1/feed", {
             "source_note_id": note_id,
             "image_formats": ["jpg", "webp", "avif"],
@@ -755,11 +765,19 @@ class XhsClient:
 
     # ─── HTML Fallback ────────────────────────────────────────────────────
 
-    def get_note_from_html(self, note_id: str, xsec_token: str) -> dict[str, Any]:
-        """Fallback: extract note data from HTML page's __INITIAL_STATE__."""
+    def get_note_from_html(self, note_id: str, xsec_token: str = "") -> dict[str, Any]:
+        """Fallback: extract note data from HTML page's __INITIAL_STATE__.
+
+        Works with or without xsec_token. When token is empty, uses the
+        bare explore URL which usually still contains note data in the
+        server-rendered HTML state.
+        """
         import re
 
-        url = f"{HOME_URL}/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_feed"
+        if xsec_token:
+            url = f"{HOME_URL}/explore/{note_id}?xsec_token={xsec_token}&xsec_source=pc_feed"
+        else:
+            url = f"{HOME_URL}/explore/{note_id}"
         resp = self._http.get(
             url,
             headers={
