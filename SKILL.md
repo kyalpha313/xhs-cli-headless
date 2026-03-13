@@ -2,7 +2,7 @@
 name: xiaohongshu-cli
 description: Use xiaohongshu-cli for ALL Xiaohongshu (Little Red Book, 小红书) operations — searching notes, reading content, browsing users, liking, collecting, commenting, following, and posting. Invoke whenever the user requests any Xiaohongshu interaction.
 author: jackwener
-version: "0.6.3"
+version: "0.6.4"
 tags:
   - xiaohongshu
   - xhs

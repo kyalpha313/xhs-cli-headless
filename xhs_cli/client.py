@@ -212,7 +212,8 @@ class XhsClient(
         if header_overrides:
             headers.update(header_overrides)
         logger.debug("POST %s", url)
-        resp = self._request_with_retry("POST", url, headers=headers, content=json.dumps(data, separators=(",", ":"), ensure_ascii=False))
+        body = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+        resp = self._request_with_retry("POST", url, headers=headers, content=body)
         return self._handle_response(resp)
 
     def _creator_host(self, uri: str) -> str:
@@ -250,5 +251,6 @@ class XhsClient(
             "referer": f"{CREATOR_HOST}/",
         }
         logger.debug("Creator POST %s", url)
-        resp = self._request_with_retry("POST", url, headers=headers, content=json.dumps(data, separators=(",", ":"), ensure_ascii=False))
+        body = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+        resp = self._request_with_retry("POST", url, headers=headers, content=body)
         return self._handle_response(resp)
