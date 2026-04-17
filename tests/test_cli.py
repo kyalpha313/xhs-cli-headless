@@ -1,10 +1,13 @@
 """Tests for CLI commands using Click's test runner."""
 
+import json
+import click
 import pytest
 import yaml
 from click.testing import CliRunner
 
 from xhs_cli.cli import cli
+from xhs_cli.exceptions import SessionExpiredError
 from xhs_cli.exceptions import NoCookieError, SessionExpiredError, UnsupportedOperationError
 
 runner = CliRunner()
@@ -57,6 +60,15 @@ class TestCliBasic:
     def test_login_help(self):
         result = runner.invoke(cli, ["login", "--help"])
         assert result.exit_code == 0
+        assert "--qrcode-http" in result.output
+        assert "--print-link" in result.output
+
+    def test_auth_help(self):
+        result = runner.invoke(cli, ["auth", "--help"])
+        assert result.exit_code == 0
+        assert "doctor" in result.output
+        assert "import" in result.output
+        assert "inspect" in result.output
 
     def test_status_help(self):
         result = runner.invoke(cli, ["status", "--help"])
@@ -66,7 +78,7 @@ class TestCliBasic:
         result = runner.invoke(cli, ["--help"])
         commands_expected = [
             # Auth
-            "login", "status", "logout", "whoami",
+            "auth", "login", "status", "logout", "whoami",
             # Reading
             "search", "read", "comments", "sub-comments", "user", "user-posts",
             "feed", "hot", "topics", "search-user", "my-notes",
@@ -84,6 +96,323 @@ class TestCliBasic:
     def test_whoami_help(self):
         result = runner.invoke(cli, ["whoami", "--help"])
         assert result.exit_code == 0
+
+    def test_auth_doctor_reports_missing_cookie_file(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "cookies.json")
+        monkeypatch.setattr("xhs_cli.commands.auth.load_saved_cookies", lambda: None)
+
+        result = runner.invoke(cli, ["auth", "doctor", "--yaml"])
+
+        assert result.exit_code == 0
+        payload = yaml.safe_load(result.output)
+        assert payload["ok"] is True
+        assert payload["data"]["cookies_file_found"] is False
+        assert payload["data"]["authenticated"] is False
+        assert payload["data"]["recommended_action"] == "import_cookies"
+
+    def test_auth_doctor_reports_valid_saved_session(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "cookies.json")
+        monkeypatch.setattr(
+            "xhs_cli.commands.auth.load_saved_cookies",
+            lambda: {"a1": "a1", "web_session": "sess", "webId": "webid"},
+        )
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {
+                    "guest": False,
+                    "basic_info": {
+                        "user_id": "u-1",
+                        "nickname": "Alice",
+                        "red_id": "alice001",
+                    },
+                }
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(cli, ["auth", "doctor", "--yaml"])
+
+        assert result.exit_code == 0
+        payload = yaml.safe_load(result.output)
+        assert payload["data"]["login_status"] == "valid"
+        assert payload["data"]["authenticated"] is True
+        assert payload["data"]["user"]["username"] == "alice001"
+
+    def test_auth_import_file_supports_browser_cookie_list(self, monkeypatch, tmp_path):
+        source_file = tmp_path / "cookies.json"
+        source_file.write_text(json.dumps({
+            "cookies": [
+                {"name": "a1", "value": "a1-token"},
+                {"name": "web_session", "value": "session-token"},
+                {"name": "webId", "value": "webid-token"},
+            ]
+        }))
+
+        saved = []
+        monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "saved-cookies.json")
+        monkeypatch.setattr("xhs_cli.commands.auth.save_cookies", lambda cookies: saved.append(cookies))
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {
+                    "guest": False,
+                    "basic_info": {
+                        "user_id": "u-1",
+                        "nickname": "Alice",
+                        "red_id": "alice001",
+                    },
+                }
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(cli, ["auth", "import", "--file", str(source_file), "--yaml"])
+
+        assert result.exit_code == 0
+        assert saved == [{
+            "a1": "a1-token",
+            "web_session": "session-token",
+            "webId": "webid-token",
+        }]
+        payload = yaml.safe_load(result.output)
+        assert payload["data"]["imported"] is True
+        assert payload["data"]["imported_cookie_count"] == 3
+        assert payload["data"]["validation"]["authenticated"] is True
+
+    def test_auth_inspect_masks_cookie_values(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "cookies.json")
+        monkeypatch.setattr(
+            "xhs_cli.commands.auth.load_saved_cookies",
+            lambda: {
+                "a1": "abcdef1234567890",
+                "web_session": "session-secret-value",
+                "webId": "webid-value",
+                "saved_at": 1776436245.0,
+            },
+        )
+
+        result = runner.invoke(cli, ["auth", "inspect", "--yaml"])
+
+        assert result.exit_code == 0
+        payload = yaml.safe_load(result.output)
+        assert payload["ok"] is True
+        assert payload["data"]["cookies"]["a1"]["present"] is True
+        assert payload["data"]["cookies"]["a1"]["fingerprint"] == "abcd…7890"
+        assert payload["data"]["cookies"]["web_session"]["length"] == len("session-secret-value")
+        assert payload["data"]["cookies"]["id_token"]["present"] is False
+
+    def test_login_qrcode_http_uses_http_flow(self, monkeypatch):
+        monkeypatch.setattr(
+            "xhs_cli.qr_login.qrcode_login",
+            lambda **kwargs: {
+                "a1": "a1-http",
+                "webId": "webid-http",
+                "web_session": "session-http",
+            } if kwargs.keys() == {"prefer_browser_assisted", "print_link", "on_status"} and kwargs["prefer_browser_assisted"] is False and kwargs["print_link"] is False and callable(kwargs["on_status"]) else (_ for _ in ()).throw(AssertionError(kwargs)),
+        )
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {
+                    "guest": False,
+                    "basic_info": {
+                        "user_id": "u-1",
+                        "nickname": "Alice",
+                        "red_id": "alice001",
+                    },
+                }
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(cli, ["login", "--qrcode-http", "--yaml"])
+
+        assert result.exit_code == 0
+        payload = yaml.safe_load(result.output)
+        assert payload["data"]["authenticated"] is True
+        assert payload["data"]["user"]["username"] == "alice001"
+
+    def test_login_browser_invalid_session_points_to_qrcode_http(self, monkeypatch):
+        monkeypatch.setattr(
+            "xhs_cli.commands.auth.get_cookies",
+            lambda cookie_source, force_refresh=False: (
+                "chrome",
+                {"a1": "a1", "web_session": "sess", "webId": "webid"},
+            ),
+        )
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {"guest": True, "basic_info": {}}
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+        monkeypatch.setattr("xhs_cli.commands.auth.time.sleep", lambda _seconds: None)
+
+        result = runner.invoke(cli, ["login", "--yaml"])
+
+        assert result.exit_code == 1
+        combined = result.output + (str(result.exception) if result.exception else "")
+        assert "xhs login --qrcode-http --print-link" in combined
+        assert "Cookies extracted from chrome" not in combined
+
+    def test_login_browser_expired_session_points_to_qrcode_http(self, monkeypatch):
+        monkeypatch.setattr(
+            "xhs_cli.commands.auth.get_cookies",
+            lambda cookie_source, force_refresh=False: (
+                "chrome",
+                {"a1": "a1", "web_session": "sess", "webId": "webid"},
+            ),
+        )
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                raise SessionExpiredError()
+
+            def __exit__(self, *args):
+                return False
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(cli, ["login", "--yaml"])
+
+        assert result.exit_code == 1
+        combined = result.output + (str(result.exception) if result.exception else "")
+        assert "xhs login --qrcode-http --print-link" in combined
+
+    def test_login_qrcode_yaml_routes_status_lines_to_stderr(self, monkeypatch):
+        def fake_qr(**kwargs):
+            kwargs["on_status"]("QR URL: https://example.com/qr")
+            return {
+                "a1": "a1-http",
+                "webId": "webid-http",
+                "web_session": "session-http",
+            }
+
+        monkeypatch.setattr("xhs_cli.qr_login.qrcode_login", fake_qr)
+        echo_calls = []
+        original_echo = click.echo
+
+        def fake_echo(message=None, file=None, nl=True, err=False, color=None):
+            if message == "QR URL: https://example.com/qr":
+                echo_calls.append(
+                    {
+                        "message": message,
+                        "err": err,
+                    }
+                )
+            return original_echo(message=message, file=file, nl=nl, err=err, color=color)
+
+        monkeypatch.setattr("xhs_cli.commands.auth.click.echo", fake_echo)
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {
+                    "guest": False,
+                    "basic_info": {
+                        "user_id": "u-1",
+                        "nickname": "Alice",
+                        "red_id": "alice001",
+                    },
+                }
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(cli, ["login", "--qrcode-http", "--yaml"])
+
+        assert result.exit_code == 0
+        payload = yaml.safe_load(result.output)
+        assert payload["data"]["authenticated"] is True
+        assert {"message": "QR URL: https://example.com/qr", "err": True} in echo_calls
+
+    def test_login_print_link_requires_qrcode_mode(self):
+        result = runner.invoke(cli, ["login", "--print-link"])
+
+        assert result.exit_code != 0
+        assert "--print-link must be used" in result.output
+
+    def test_sub_comments_uses_note_reference_resolution(self, monkeypatch):
+        monkeypatch.setattr(
+            "xhs_cli.commands.reading.resolve_note_reference",
+            lambda id_or_url, xsec_token="": ("note-123", "token-abc", "pc_search"),
+        )
+        calls = {}
+
+        class FakeClient:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_sub_comments(self, note_id, comment_id, cursor="", xsec_token="", xsec_source=""):
+                calls["args"] = {
+                    "note_id": note_id,
+                    "comment_id": comment_id,
+                    "cursor": cursor,
+                    "xsec_token": xsec_token,
+                    "xsec_source": xsec_source,
+                }
+                return {"comments": []}
+
+        monkeypatch.setattr("xhs_cli.commands._common.get_client", lambda ctx: FakeClient())
+        monkeypatch.setattr("xhs_cli.commands.reading.cache_note_context", lambda *args, **kwargs: None)
+
+        result = runner.invoke(cli, ["sub-comments", "1", "comment-1", "--yaml"])
+
+        assert result.exit_code == 0
+        assert calls["args"] == {
+            "note_id": "note-123",
+            "comment_id": "comment-1",
+            "cursor": "",
+            "xsec_token": "token-abc",
+            "xsec_source": "pc_search",
+        }
 
     def test_hot_help(self):
         result = runner.invoke(cli, ["hot", "--help"])

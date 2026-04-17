@@ -5,8 +5,10 @@ from __future__ import annotations
 import functools
 import json
 import logging
+import os
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from collections import OrderedDict
@@ -26,12 +28,56 @@ _TOKEN_CACHE_PATH: Path | None = None
 NOTE_CONTEXT_TTL_SECONDS = 86400
 
 
+def _is_writable_dir(path: Path) -> bool:
+    """Return True when *path* can be used for config files."""
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".write-test"
+        probe.write_text("")
+        probe.unlink()
+        return True
+    except OSError as exc:
+        logger.debug("Config dir %s is not writable: %s", path, exc)
+        return False
+
+
+def _set_restricted_permissions(path: Path) -> None:
+    """Best-effort chmod used for cookie and cache files."""
+    try:
+        path.chmod(0o600)
+    except OSError as exc:
+        logger.debug("Failed to set restricted permissions on %s: %s", path, exc)
+
+
 
 def get_config_dir() -> Path:
-    """Get or create config directory."""
-    config_dir = Path.home() / CONFIG_DIR_NAME
-    config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir
+    """Get a writable config directory.
+
+    Resolution order:
+    1. `XHS_CONFIG_DIR` when explicitly provided
+    2. `~/.xiaohongshu-cli`
+    3. A temporary directory fallback for restricted environments
+    """
+    configured = os.environ.get("XHS_CONFIG_DIR", "").strip()
+    candidates: list[Path] = []
+    if configured:
+        candidates.append(Path(configured).expanduser())
+    candidates.append(Path.home() / CONFIG_DIR_NAME)
+    fallback = Path(tempfile.gettempdir()) / CONFIG_DIR_NAME
+    if fallback not in candidates:
+        candidates.append(fallback)
+
+    for config_dir in candidates:
+        if _is_writable_dir(config_dir):
+            if config_dir == fallback and not configured:
+                logger.warning(
+                    "Config dir %s is unavailable; using temporary fallback %s",
+                    Path.home() / CONFIG_DIR_NAME,
+                    fallback,
+                )
+            return config_dir
+
+    raise OSError(f"No writable config directory available for {CONFIG_DIR_NAME}")
 
 
 def get_cookie_path() -> Path:
@@ -69,7 +115,7 @@ def save_cookies(cookies: dict[str, str]) -> None:
     cookie_path = get_cookie_path()
     payload = {**cookies, "saved_at": time.time()}
     cookie_path.write_text(json.dumps(payload, indent=2))
-    cookie_path.chmod(0o600)
+    _set_restricted_permissions(cookie_path)
     logger.debug("Saved cookies to %s", cookie_path)
 
 
@@ -175,7 +221,7 @@ def save_token_cache(cache: dict[str, dict[str, Any]]) -> None:
 
     with _TOKEN_CACHE_LOCK:
         cache_path.write_text(json.dumps(normalized, indent=2))
-        cache_path.chmod(0o600)
+        _set_restricted_permissions(cache_path)
         _TOKEN_CACHE_MEMORY = normalized
         _TOKEN_CACHE_PATH = cache_path
 
@@ -269,7 +315,7 @@ def save_note_index(items: list[dict[str, str]]) -> None:
         if entry
     ]
     path.write_text(json.dumps(normalized, indent=2, ensure_ascii=False))
-    path.chmod(0o600)
+    _set_restricted_permissions(path)
     logger.debug("Saved note index with %d entries", len(normalized))
 
 

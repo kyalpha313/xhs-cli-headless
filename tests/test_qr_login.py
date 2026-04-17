@@ -111,6 +111,26 @@ class _SelfInfoFallbackQrClient(_FakeQrClient):
         }
 
 
+class _WaitingQrClient(_FakeQrClient):
+    def check_qr_status(self, qr_id, code):
+        self.status_calls += 1
+        self.status_seen_web_session = self.cookies.get("web_session")
+        return {"codeStatus": 0}
+
+
+class _ScannedQrClient(_FakeQrClient):
+    def check_qr_status(self, qr_id, code):
+        self.status_calls += 1
+        self.status_seen_web_session = self.cookies.get("web_session")
+        return {"codeStatus": 1}
+
+
+class _PollingErrorQrClient(_FakeQrClient):
+    def check_qr_status(self, qr_id, code):
+        self.status_calls += 1
+        raise RuntimeError("temporary network issue")
+
+
 def test_qrcode_login_completes_after_confirmation_and_saves_real_session(monkeypatch):
     saved = []
 
@@ -217,6 +237,60 @@ def test_qrcode_login_falls_back_when_browser_backend_unavailable(monkeypatch):
         "webId": "webid-http",
         "web_session": "http-session",
     }
+
+
+def test_qrcode_login_prints_link_when_requested(monkeypatch):
+    messages = []
+
+    monkeypatch.setattr("xhs_cli.qr_login.XhsClient", _FakeQrClient)
+    monkeypatch.setattr("xhs_cli.qr_login._generate_a1", lambda: "a1-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._generate_webid", lambda: "webid-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._display_qr_in_terminal", lambda data: True)
+    monkeypatch.setattr("xhs_cli.qr_login.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("xhs_cli.qr_login.save_cookies", lambda cookies: None)
+
+    qrcode_login(timeout_s=1, print_link=True, on_status=messages.append)
+
+    assert any("QR URL: https://example.com/qr" in message for message in messages)
+
+
+def test_qrcode_login_timeout_before_scan_has_actionable_hint(monkeypatch):
+    monkeypatch.setattr("xhs_cli.qr_login.XhsClient", _WaitingQrClient)
+    monkeypatch.setattr("xhs_cli.qr_login._generate_a1", lambda: "a1-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._generate_webid", lambda: "webid-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._display_qr_in_terminal", lambda data: True)
+    monkeypatch.setattr("xhs_cli.qr_login.time.sleep", lambda seconds: None)
+    time_values = iter([0.0, 0.0, 0.5, 1.1])
+    monkeypatch.setattr("xhs_cli.qr_login.time.time", lambda: next(time_values))
+
+    with pytest.raises(XhsApiError, match="was not scanned before timeout"):
+        qrcode_login(timeout_s=1)
+
+
+def test_qrcode_login_timeout_after_scan_has_confirmation_hint(monkeypatch):
+    monkeypatch.setattr("xhs_cli.qr_login.XhsClient", _ScannedQrClient)
+    monkeypatch.setattr("xhs_cli.qr_login._generate_a1", lambda: "a1-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._generate_webid", lambda: "webid-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._display_qr_in_terminal", lambda data: True)
+    monkeypatch.setattr("xhs_cli.qr_login.time.sleep", lambda seconds: None)
+    time_values = iter([0.0, 0.0, 0.5, 1.1])
+    monkeypatch.setattr("xhs_cli.qr_login.time.time", lambda: next(time_values))
+
+    with pytest.raises(XhsApiError, match="scanned but not confirmed"):
+        qrcode_login(timeout_s=1)
+
+
+def test_qrcode_login_repeated_polling_errors_are_actionable(monkeypatch):
+    monkeypatch.setattr("xhs_cli.qr_login.XhsClient", _PollingErrorQrClient)
+    monkeypatch.setattr("xhs_cli.qr_login._generate_a1", lambda: "a1-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._generate_webid", lambda: "webid-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._display_qr_in_terminal", lambda data: True)
+    monkeypatch.setattr("xhs_cli.qr_login.time.sleep", lambda seconds: None)
+    time_values = iter([0.0, 0.0, 0.1, 0.2])
+    monkeypatch.setattr("xhs_cli.qr_login.time.time", lambda: next(time_values))
+
+    with pytest.raises(XhsApiError, match="QR status polling failed repeatedly"):
+        qrcode_login(timeout_s=10)
 
 
 def test_normalize_browser_cookies_uses_allowlist():

@@ -10,6 +10,7 @@ from xhs_cli.cookies import (
     cache_note_context,
     clear_cookies,
     cookies_to_string,
+    get_config_dir,
     get_cached_note_context,
     get_cached_xsec_token,
     get_cookies,
@@ -50,6 +51,30 @@ class TestSaveCookies:
         cookie_file = tmp_config_dir / "cookies.json"
         stat = cookie_file.stat()
         assert stat.st_mode & 0o777 == 0o600
+
+
+class TestConfigDirResolution:
+    def test_prefers_env_override(self, tmp_path, monkeypatch):
+        override = tmp_path / "custom-config"
+        monkeypatch.setenv("XHS_CONFIG_DIR", str(override))
+
+        assert get_config_dir() == override
+        assert override.is_dir()
+
+    def test_falls_back_to_temp_dir_when_home_config_is_unwritable(self, tmp_path, monkeypatch):
+        home_dir = tmp_path / "home"
+        temp_root = tmp_path / "tmp-root"
+        fallback = temp_root / ".xiaohongshu-cli"
+
+        monkeypatch.delenv("XHS_CONFIG_DIR", raising=False)
+        monkeypatch.setattr("xhs_cli.cookies.Path.home", lambda: home_dir)
+        monkeypatch.setattr("xhs_cli.cookies.tempfile.gettempdir", lambda: str(temp_root))
+        monkeypatch.setattr(
+            "xhs_cli.cookies._is_writable_dir",
+            lambda path: path == fallback,
+        )
+
+        assert get_config_dir() == fallback
 
 
 class TestLoadSavedCookies:

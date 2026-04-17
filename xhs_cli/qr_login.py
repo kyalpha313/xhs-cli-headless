@@ -65,6 +65,31 @@ def _emit_status(on_status: callable[[str], None] | None, msg: str) -> None:
         print(msg)
 
 
+def _qr_timeout_error(*, last_status: int, timeout_s: int, browser_assisted: bool = False) -> XhsApiError:
+    """Build an actionable timeout error for QR login flows."""
+    if last_status == QR_SCANNED:
+        detail = "QR code was scanned but not confirmed in the Xiaohongshu app before timeout."
+    elif last_status == QR_WAITING:
+        detail = "QR code was not scanned before timeout."
+    else:
+        detail = "QR login did not complete before timeout."
+
+    if browser_assisted:
+        hint = "Retry with: xhs login --qrcode or force headless mode with: xhs login --qrcode-http --print-link"
+    else:
+        hint = "Retry with: xhs login --qrcode-http --print-link"
+
+    return XhsApiError(f"{detail} Timeout={timeout_s}s. {hint}")
+
+
+def _qr_polling_error(exc: Exception) -> XhsApiError:
+    """Build an actionable error after repeated QR polling failures."""
+    return XhsApiError(
+        "QR status polling failed repeatedly. Check your network connection and retry with: "
+        f"xhs login --qrcode-http --print-link (last error: {exc})"
+    )
+
+
 def _apply_session_cookies(client: XhsClient, payload: dict[str, Any]) -> None:
     """Persist any session cookies returned by the QR login endpoints."""
     login_info = payload.get("login_info", {})
@@ -341,6 +366,7 @@ def _browser_assisted_qrcode_login(
     *,
     on_status: callable[[str], None] | None = None,
     timeout_s: int = POLL_TIMEOUT_S,
+    print_link: bool = False,
 ) -> dict[str, str]:
     """Log in by letting a real browser complete the QR flow, then export cookies."""
     _ensure_camoufox_ready()
@@ -396,8 +422,10 @@ def _browser_assisted_qrcode_login(
             raise XhsApiError(f"Browser-assisted QR login did not expose a QR URL: {qr_payload}")
 
         _emit_status(on_status, "\n📱 Scan the QR code below with the Xiaohongshu app:\n")
-        if not _display_qr_in_terminal(qr_url):
+        rendered = _display_qr_in_terminal(qr_url)
+        if not rendered:
             _emit_status(on_status, "⚠️  Install 'qrcode' for terminal rendering: pip install qrcode")
+        if print_link or not rendered:
             _emit_status(on_status, f"QR URL: {qr_url}")
         _emit_status(on_status, "\n⏳ Waiting for QR code scan...")
 
@@ -408,7 +436,7 @@ def _browser_assisted_qrcode_login(
             ) as completion_info:
                 pass
         except Exception as exc:
-            raise XhsApiError("QR code login timed out while waiting for browser completion.") from exc
+            raise _qr_timeout_error(last_status=state["last_status"], timeout_s=timeout_s, browser_assisted=True) from exc
 
         _raise_for_browser_response(completion_info.value)
         completion_data = _browser_response_payload(completion_info.value)
@@ -447,6 +475,7 @@ def _http_qrcode_login(
     *,
     on_status: callable[[str], None] | None = None,
     timeout_s: int = POLL_TIMEOUT_S,
+    print_link: bool = False,
 ) -> dict[str, str]:
     """Run the legacy pure-HTTP QR login flow."""
     a1 = _generate_a1()
@@ -475,8 +504,10 @@ def _http_qrcode_login(
         logger.debug("QR created: qr_id=%s, code=%s", qr_id, code)
 
         _emit_status(on_status, "\n📱 Scan the QR code below with the Xiaohongshu app:\n")
-        if not _display_qr_in_terminal(qr_url):
+        rendered = _display_qr_in_terminal(qr_url)
+        if not rendered:
             _emit_status(on_status, "⚠️  Install 'qrcode' for terminal rendering: pip install qrcode")
+        if print_link or not rendered:
             _emit_status(on_status, f"QR URL: {qr_url}")
         _emit_status(on_status, "\n⏳ Waiting for QR code scan...")
 
@@ -493,7 +524,7 @@ def _http_qrcode_login(
                 logger.debug("QR status check error: %s", exc)
                 consecutive_errors += 1
                 if consecutive_errors >= 3:
-                    raise XhsApiError(f"QR status polling failed repeatedly: {exc}") from exc
+                    raise _qr_polling_error(exc) from exc
                 continue
             else:
                 consecutive_errors = 0
@@ -529,7 +560,7 @@ def _http_qrcode_login(
             if int(elapsed) % 30 == 0 and int(elapsed) > 0:
                 _emit_status(on_status, "  Still waiting...")
 
-    raise XhsApiError("QR code login timed out after 4 minutes")
+    raise _qr_timeout_error(last_status=last_status, timeout_s=timeout_s)
 
 
 def qrcode_login(
@@ -537,12 +568,17 @@ def qrcode_login(
     on_status: callable[[str], None] | None = None,
     timeout_s: int = POLL_TIMEOUT_S,
     prefer_browser_assisted: bool = False,
+    print_link: bool = False,
 ) -> dict[str, str]:
     """Run the QR code login flow."""
     if prefer_browser_assisted:
         try:
-            return _browser_assisted_qrcode_login(on_status=on_status, timeout_s=timeout_s)
+            return _browser_assisted_qrcode_login(
+                on_status=on_status,
+                timeout_s=timeout_s,
+                print_link=print_link,
+            )
         except BrowserQrLoginUnavailable as exc:
             logger.info("Browser-assisted QR login unavailable, falling back to HTTP flow: %s", exc)
 
-    return _http_qrcode_login(on_status=on_status, timeout_s=timeout_s)
+    return _http_qrcode_login(on_status=on_status, timeout_s=timeout_s, print_link=print_link)

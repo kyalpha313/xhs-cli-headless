@@ -259,17 +259,35 @@ class ReadingEndpointsMixin:
         return self._main_api_get("/api/sns/web/v2/user/me")
 
     def get_user_info(self, user_id: str) -> dict[str, Any]:
-        return self._main_api_get("/api/sns/web/v1/user/otherinfo", {
-            "target_user_id": user_id,
-        })
+        try:
+            return self._main_api_get("/api/sns/web/v1/user/otherinfo", {
+                "target_user_id": user_id,
+            })
+        except XhsApiError as exc:
+            if exc.code == -1:
+                raise UnsupportedOperationError(
+                    "User profile lookup is currently unavailable from the public web API "
+                    "(server rejected /api/sns/web/v1/user/otherinfo with code -1). "
+                    "Use `xhs search`, `xhs read`, or a note URL as a fallback entry point."
+                ) from exc
+            raise
 
     def get_user_notes(self, user_id: str, cursor: str = "") -> dict[str, Any]:
-        return self._main_api_get("/api/sns/web/v1/user_posted", {
-            "num": 30,
-            "cursor": cursor,
-            "user_id": user_id,
-            "image_scenes": "FD_WM_WEBP",
-        })
+        try:
+            return self._main_api_get("/api/sns/web/v1/user_posted", {
+                "num": 30,
+                "cursor": cursor,
+                "user_id": user_id,
+                "image_scenes": "FD_WM_WEBP",
+            })
+        except XhsApiError as exc:
+            if exc.code == -1:
+                raise UnsupportedOperationError(
+                    "User posts lookup is currently unavailable from the public web API "
+                    "(server rejected /api/sns/web/v1/user_posted with code -1). "
+                    "Use `xhs search`, `xhs read`, or note-driven workflows as a fallback."
+                ) from exc
+            raise
 
     def search_notes(
         self,
@@ -472,12 +490,17 @@ class ReadingEndpointsMixin:
         root_comment_id: str,
         num: int = 30,
         cursor: str = "",
+        xsec_token: str = "",
+        xsec_source: str = "",
     ) -> Any:
+        token, source = self.resolve_xsec_context(note_id, xsec_token, xsec_source or "pc_feed")
         return self._main_api_get("/api/sns/web/v2/comment/sub/page", {
             "note_id": note_id,
             "root_comment_id": root_comment_id,
             "num": num,
             "cursor": cursor,
+            "xsec_token": token,
+            "xsec_source": source,
         })
 
 
@@ -492,12 +515,28 @@ class InteractionEndpointsMixin:
         })
 
     def reply_comment(self, note_id: str, target_comment_id: str, content: str) -> Any:
-        return self._main_api_post("/api/sns/web/v1/comment/post", {
+        payload = {
             "note_id": note_id,
             "content": content,
             "target_comment_id": target_comment_id,
             "at_users": [],
-        })
+        }
+        try:
+            return self._main_api_post("/api/sns/web/v1/comment/post", payload)
+        except XhsApiError as exc:
+            if exc.code == -9043:
+                time.sleep(3)
+                try:
+                    return self._main_api_post("/api/sns/web/v1/comment/post", payload)
+                except XhsApiError as retry_exc:
+                    if retry_exc.code == -9043:
+                        raise XhsApiError(
+                            "Reply was rate-limited by Xiaohongshu (code -9043). Wait a moment and retry.",
+                            code="rate_limited",
+                            response=retry_exc.response,
+                        ) from retry_exc
+                    raise
+            raise
 
     def like_note(self, note_id: str) -> dict[str, Any]:
         return self._main_api_post("/api/sns/web/v1/note/like", {"note_oid": note_id})
@@ -659,22 +698,46 @@ class NotificationEndpointsMixin:
         return self._main_api_get("/api/sns/web/unread_count", {})
 
     def get_notification_mentions(self, cursor: str = "", num: int = 20) -> dict[str, Any]:
-        return self._main_api_get("/api/sns/web/v1/you/mentions", {
-            "num": num,
-            "cursor": cursor,
-        })
+        try:
+            return self._main_api_get("/api/sns/web/v1/you/mentions", {
+                "num": num,
+                "cursor": cursor,
+            })
+        except XhsApiError as exc:
+            if exc.code == -1:
+                raise UnsupportedOperationError(
+                    "Notification list is currently unavailable from the public web API. "
+                    "Use `xhs unread` as a lightweight fallback."
+                ) from exc
+            raise
 
     def get_notification_likes(self, cursor: str = "", num: int = 20) -> dict[str, Any]:
-        return self._main_api_get("/api/sns/web/v1/you/likes", {
-            "num": num,
-            "cursor": cursor,
-        })
+        try:
+            return self._main_api_get("/api/sns/web/v1/you/likes", {
+                "num": num,
+                "cursor": cursor,
+            })
+        except XhsApiError as exc:
+            if exc.code == -1:
+                raise UnsupportedOperationError(
+                    "Notification list is currently unavailable from the public web API. "
+                    "Use `xhs unread` as a lightweight fallback."
+                ) from exc
+            raise
 
     def get_notification_connections(self, cursor: str = "", num: int = 20) -> dict[str, Any]:
-        return self._main_api_get("/api/sns/web/v1/you/connections", {
-            "num": num,
-            "cursor": cursor,
-        })
+        try:
+            return self._main_api_get("/api/sns/web/v1/you/connections", {
+                "num": num,
+                "cursor": cursor,
+            })
+        except XhsApiError as exc:
+            if exc.code == -1:
+                raise UnsupportedOperationError(
+                    "Notification list is currently unavailable from the public web API. "
+                    "Use `xhs unread` as a lightweight fallback."
+                ) from exc
+            raise
 
 
 class AuthEndpointsMixin:

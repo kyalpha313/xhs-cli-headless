@@ -226,16 +226,28 @@ def topics(ctx, keyword: str, as_json: bool, as_yaml: bool):
 
 
 @click.command("sub-comments")
-@click.argument("note_id")
+@click.argument("id_or_url")
 @click.argument("comment_id")
 @click.option("--cursor", default="", help="Pagination cursor")
+@click.option("--xsec-token", default="", help="Security token (or reuse a cached token for this note)")
 @structured_output_options
 @click.pass_context
-def sub_comments(ctx, note_id: str, comment_id: str, cursor: str, as_json: bool, as_yaml: bool):
+def sub_comments(ctx, id_or_url: str, comment_id: str, cursor: str, xsec_token: str, as_json: bool, as_yaml: bool):
     """View replies to a specific comment."""
+    note_id, token, url_source = resolve_note_reference(id_or_url, xsec_token=xsec_token)
+    xsec_source = url_source or "pc_feed"
+    if token:
+        cache_note_context(note_id, token, xsec_source)
+
     handle_command(
         ctx,
-        action=lambda client: client.get_sub_comments(note_id, comment_id, cursor=cursor),
+        action=lambda client: client.get_sub_comments(
+            note_id,
+            comment_id,
+            cursor=cursor,
+            xsec_token=token,
+            xsec_source=xsec_source if token else "",
+        ),
         render=render_comments,
         as_json=as_json,
         as_yaml=as_yaml,

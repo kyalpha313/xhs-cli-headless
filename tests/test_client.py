@@ -102,6 +102,156 @@ class TestTransportCookies:
 
 
 class TestReadingEndpointBehavior:
+    def test_get_user_info_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
+        def fake_get(self, uri, params=None):
+            raise XhsApiError(
+                "API error: {\"code\": -1, \"success\": false}",
+                code=-1,
+                response={"code": -1, "success": False},
+            )
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            with pytest.raises(UnsupportedOperationError, match="User profile lookup is currently unavailable"):
+                client.get_user_info("user-123")
+        finally:
+            client.close()
+
+    def test_get_user_notes_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
+        def fake_get(self, uri, params=None):
+            raise XhsApiError(
+                "API error: {\"code\": -1, \"success\": false}",
+                code=-1,
+                response={"code": -1, "success": False},
+            )
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            with pytest.raises(UnsupportedOperationError, match="User posts lookup is currently unavailable"):
+                client.get_user_notes("user-123")
+        finally:
+            client.close()
+
+    def test_get_sub_comments_uses_resolved_xsec_context(self, monkeypatch):
+        captured = {}
+
+        def fake_get(self, uri, params=None):
+            captured["uri"] = uri
+            captured["params"] = params
+            return {"comments": []}
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+        monkeypatch.setattr(
+            XhsClient,
+            "resolve_xsec_context",
+            lambda self, note_id, xsec_token, xsec_source: ("token-abc", "pc_search"),
+        )
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            client.get_sub_comments("note-123", "comment-123")
+        finally:
+            client.close()
+
+        assert captured["uri"] == "/api/sns/web/v2/comment/sub/page"
+        assert captured["params"]["xsec_token"] == "token-abc"
+        assert captured["params"]["xsec_source"] == "pc_search"
+
+    def test_reply_comment_retries_rate_limited_once(self, monkeypatch):
+        calls = {"count": 0}
+
+        def fake_post(self, uri, data, header_overrides=None):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise XhsApiError(
+                    "API error: {\"code\": -9043}",
+                    code=-9043,
+                    response={"code": -9043},
+                )
+            return {"success": True}
+
+        monkeypatch.setattr(XhsClient, "_main_api_post", fake_post)
+        monkeypatch.setattr("xhs_cli.client_mixins.time.sleep", lambda _seconds: None)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            result = client.reply_comment("note-123", "comment-123", "hello")
+        finally:
+            client.close()
+
+        assert result == {"success": True}
+        assert calls["count"] == 2
+
+    def test_reply_comment_maps_persistent_rate_limit_to_clear_error(self, monkeypatch):
+        def fake_post(self, uri, data, header_overrides=None):
+            raise XhsApiError(
+                "API error: {\"code\": -9043}",
+                code=-9043,
+                response={"code": -9043},
+            )
+
+        monkeypatch.setattr(XhsClient, "_main_api_post", fake_post)
+        monkeypatch.setattr("xhs_cli.client_mixins.time.sleep", lambda _seconds: None)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            with pytest.raises(XhsApiError, match="Reply was rate-limited"):
+                client.reply_comment("note-123", "comment-123", "hello")
+        finally:
+            client.close()
+
+    def test_notification_mentions_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
+        def fake_get(self, uri, params=None):
+            raise XhsApiError(
+                "API error: {\"code\": -1, \"success\": false}",
+                code=-1,
+                response={"code": -1, "success": False},
+            )
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+        client = XhsClient({"a1": "cookie"})
+        try:
+            with pytest.raises(UnsupportedOperationError, match="Notification list is currently unavailable"):
+                client.get_notification_mentions()
+        finally:
+            client.close()
+
+    def test_notification_likes_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
+        def fake_get(self, uri, params=None):
+            raise XhsApiError(
+                "API error: {\"code\": -1, \"success\": false}",
+                code=-1,
+                response={"code": -1, "success": False},
+            )
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+        client = XhsClient({"a1": "cookie"})
+        try:
+            with pytest.raises(UnsupportedOperationError, match="Notification list is currently unavailable"):
+                client.get_notification_likes()
+        finally:
+            client.close()
+
+    def test_notification_connections_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
+        def fake_get(self, uri, params=None):
+            raise XhsApiError(
+                "API error: {\"code\": -1, \"success\": false}",
+                code=-1,
+                response={"code": -1, "success": False},
+            )
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+        client = XhsClient({"a1": "cookie"})
+        try:
+            with pytest.raises(UnsupportedOperationError, match="Notification list is currently unavailable"):
+                client.get_notification_connections()
+        finally:
+            client.close()
+
     def test_get_note_detail_prefers_cached_xsec_source(self, monkeypatch):
         captured = {}
 

@@ -8,3 +8,5 @@ dist/
 .pytest_cache/
 .playwright-mcp/
 xhs_login_page.png
+project_design.md
+xhs_cli/test/

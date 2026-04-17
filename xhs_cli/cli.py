@@ -70,6 +70,7 @@ def cli(ctx, verbose: bool, cookie_source: str):
 
 # ─── Auth commands ───────────────────────────────────────────────────────────
 
+cli.add_command(auth.auth)
 cli.add_command(auth.login)
 cli.add_command(auth.status)
 cli.add_command(auth.logout)
