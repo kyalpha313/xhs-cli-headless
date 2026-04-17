@@ -1,8 +1,8 @@
-﻿# xhs-cli-headless
+# xhs-cli-headless
 
 一个面向无 GUI / 远程服务器 / Agent 场景的小红书 CLI fork。
 
-- Fork 仓库：[hostage007/xhs-cli-headless](https://github.com/hostage007/xhs-cli-headless)
+- Fork 仓库：[kyalpha313/xhs-cli-headless](https://github.com/kyalpha313/xhs-cli-headless)
 - 上游项目：[jackwener/xiaohongshu-cli](https://github.com/jackwener/xiaohongshu-cli)
 - CLI 命令：`xhs`
 
@@ -91,19 +91,19 @@
 #### 方式 1：直接从本 fork 安装
 
 ```bash
-uv tool install git+https://github.com/hostage007/xhs-cli-headless
+uv tool install git+https://github.com/kyalpha313/xhs-cli-headless
 ```
 
 或：
 
 ```bash
-pipx install git+https://github.com/hostage007/xhs-cli-headless
+pipx install git+https://github.com/kyalpha313/xhs-cli-headless
 ```
 
 #### 方式 2：源码运行
 
 ```bash
-git clone https://github.com/hostage007/xhs-cli-headless.git
+git clone https://github.com/kyalpha313/xhs-cli-headless.git
 cd xhs-cli-headless
 uv sync
 ```
@@ -232,7 +232,7 @@ uv run pytest -m smoke tests/test_smoke.py -q
 
 Fork repository:
 
-- [hostage007/xhs-cli-headless](https://github.com/hostage007/xhs-cli-headless)
+- [kyalpha313/xhs-cli-headless](https://github.com/kyalpha313/xhs-cli-headless)
 
 Upstream project:
 
@@ -284,19 +284,19 @@ Recommended as stable for the first release:
 Install from this fork:
 
 ```bash
-uv tool install git+https://github.com/hostage007/xhs-cli-headless
+uv tool install git+https://github.com/kyalpha313/xhs-cli-headless
 ```
 
 or:
 
 ```bash
-pipx install git+https://github.com/hostage007/xhs-cli-headless
+pipx install git+https://github.com/kyalpha313/xhs-cli-headless
 ```
 
 Run from source:
 
 ```bash
-git clone https://github.com/hostage007/xhs-cli-headless.git
+git clone https://github.com/kyalpha313/xhs-cli-headless.git
 cd xhs-cli-headless
 uv sync
 ```

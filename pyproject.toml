@@ -34,9 +34,9 @@ dependencies = [
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.11.0", "mypy>=1.15.0"]
 
 [project.urls]
-Homepage = "https://github.com/hostage007/xhs-cli-headless"
-Repository = "https://github.com/hostage007/xhs-cli-headless"
-Issues = "https://github.com/hostage007/xhs-cli-headless/issues"
+Homepage = "https://github.com/kyalpha313/xhs-cli-headless"
+Repository = "https://github.com/kyalpha313/xhs-cli-headless"
+Issues = "https://github.com/kyalpha313/xhs-cli-headless/issues"
 
 [project.scripts]
 xhs = "xhs_cli.cli:cli"
