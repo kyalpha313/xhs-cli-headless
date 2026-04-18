@@ -24,6 +24,7 @@ from .constants import (
     WINDOWS_USER_AGENT,
 )
 
+
 def _build_config(*, user_agent: str, platform: str) -> CryptoConfig:
     return CryptoConfig().with_overrides(
         PUBLIC_USERAGENT=user_agent,

@@ -221,10 +221,11 @@ def _doctor_payload(cookies: dict[str, str] | None) -> dict[str, Any]:
             login_status="unknown",
         )
     except XhsApiError as exc:
+        creator_status = payload["domains"]["creator"]["login_status"]
         payload["domains"]["creator"] = _domain_status_payload(
             name="creator",
             authenticated=False,
-            login_status="invalid" if payload["domains"]["creator"]["login_status"] == "missing" else payload["domains"]["creator"]["login_status"],
+            login_status="invalid" if creator_status == "missing" else creator_status,
             validation_error={
                 "code": exc.code or "api_error",
                 "message": str(exc),

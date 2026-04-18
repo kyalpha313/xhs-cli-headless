@@ -182,7 +182,9 @@ window.__INITIAL_SSR_STATE__ = {"Main":{"albumInfo":{"name":"Board A","desc":"de
     def test_extract_board_from_legacy_html(self):
         html = """
 <script>
-window.__INITIAL_STATE__={"board":{"boardDetails":{"board-2":{"name":"Legacy Board","desc":"old","noteCount":1}},"boardFeedsMap":{"board-2":{"notes":[{"noteId":"n9","xsec_token":"tok-9","displayTitle":"Legacy note","type":"normal","user":{"nickname":"Carol"},"cover":{"url":"https://img/9.jpg?foo=1"}}]}}}}</script>
+window.__INITIAL_STATE__={"board":{"boardDetails":{"board-2":{"name":"Legacy Board","desc":"old","noteCount":1}},
+"boardFeedsMap":{"board-2":{"notes":[{"noteId":"n9","xsec_token":"tok-9","displayTitle":"Legacy note",
+"type":"normal","user":{"nickname":"Carol"},"cover":{"url":"https://img/9.jpg?foo=1"}}]}}}}</script>
 """
         data = extract_board_from_html(html, "board-2")
         assert data["board_id"] == "board-2"
