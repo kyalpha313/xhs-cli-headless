@@ -12,7 +12,6 @@ from click.testing import CliRunner
 from xhs_cli.cli import cli
 from xhs_cli.cookies import get_cookie_path, load_saved_cookies, save_cookies
 
-
 runner = CliRunner()
 
 
@@ -132,7 +131,10 @@ def main():
     parser.add_argument(
         "--enable-creator-write-tests",
         action="store_true",
-        help="Run post/delete validation. Keep disabled unless delete rollback has been verified for the current session type.",
+        help=(
+            "Run post/delete validation. Keep disabled unless delete rollback "
+            "has been verified for the current session type."
+        ),
     )
     parser.add_argument(
         "--enable-browser-login-check",
@@ -248,7 +250,13 @@ def main():
 
         unique = str(int(time.time()))
         result, payload = invoke("comment", note_id, "-c", f"release test {unique}")
-        comment_ok = record(report, "comment", result, payload, note="write test; will delete if comment id is returned")
+        comment_ok = record(
+            report,
+            "comment",
+            result,
+            payload,
+            note="write test; will delete if comment id is returned",
+        )
         comment_id = ""
         if comment_ok:
             data = extract_data(payload) or {}
@@ -264,7 +272,14 @@ def main():
             record_skip(report, "delete-comment", "Comment id not returned; no delete target available")
 
         if parent_comment_id:
-            result, payload = invoke("reply", note_id, "--comment-id", parent_comment_id, "-c", f"release reply {unique}")
+            result, payload = invoke(
+                "reply",
+                note_id,
+                "--comment-id",
+                parent_comment_id,
+                "-c",
+                f"release reply {unique}",
+            )
             reply_ok = record(report, "reply", result, payload, note="write test; will delete if reply id is returned")
             reply_id = ""
             if reply_ok:
@@ -333,7 +348,10 @@ def main():
         record_skip(
             report,
             "post",
-            "Skipped by design. Enable only after creator delete rollback is verified for the current login/session type.",
+            (
+                "Skipped by design. Enable only after creator delete rollback is "
+                "verified for the current login/session type."
+            ),
         )
         record_skip(
             report,
@@ -346,7 +364,13 @@ def main():
         # and restore it after the check to keep the rest of the release environment stable.
         backup_cookies = load_saved_cookies() or {}
         result, payload = invoke("login")
-        record(report, "login-browser", result, payload, note="browser extraction path; saved session restored afterwards")
+        record(
+            report,
+            "login-browser",
+            result,
+            payload,
+            note="browser extraction path; saved session restored afterwards",
+        )
         if backup_cookies:
             save_cookies({k: v for k, v in backup_cookies.items() if k != "saved_at"})
         else:

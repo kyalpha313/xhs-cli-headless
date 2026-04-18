@@ -450,7 +450,11 @@ def _browser_assisted_qrcode_login(
             ) as completion_info:
                 pass
         except Exception as exc:
-            raise _qr_timeout_error(last_status=state["last_status"], timeout_s=timeout_s, browser_assisted=True) from exc
+            raise _qr_timeout_error(
+                last_status=state["last_status"],
+                timeout_s=timeout_s,
+                browser_assisted=True,
+            ) from exc
 
         _raise_for_browser_response(completion_info.value)
         completion_data = _browser_response_payload(completion_info.value)

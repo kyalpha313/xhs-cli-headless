@@ -1,6 +1,5 @@
 """Unit tests for cookie management (no network required)."""
 
-
 import time
 
 import pytest
@@ -10,9 +9,9 @@ from xhs_cli.cookies import (
     cache_note_context,
     clear_cookies,
     cookies_to_string,
-    get_config_dir,
     get_cached_note_context,
     get_cached_xsec_token,
+    get_config_dir,
     get_cookies,
     get_index_cache_path,
     get_note_by_index,

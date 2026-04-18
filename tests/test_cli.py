@@ -1,13 +1,14 @@
 """Tests for CLI commands using Click's test runner."""
 
 import json
+
 import click
 import pytest
 import yaml
 from click.testing import CliRunner
 
 from xhs_cli.cli import cli
-from xhs_cli.exceptions import NoCookieError, SessionExpiredError
+from xhs_cli.exceptions import SessionExpiredError
 
 runner = CliRunner()
 
@@ -30,6 +31,18 @@ FAKE_NOTE_RESPONSE = {
         }
     ]
 }
+
+
+def _assert_qrcode_kwargs(expected_print_link: bool, **kwargs):
+    assert kwargs.keys() == {"prefer_browser_assisted", "print_link", "on_status"}
+    assert kwargs["prefer_browser_assisted"] is False
+    assert kwargs["print_link"] is expected_print_link
+    assert callable(kwargs["on_status"])
+    return {
+        "a1": "a1-http",
+        "webId": "webid-http",
+        "web_session": "session-http",
+    }
 
 
 class TestCliBasic:
@@ -301,11 +314,7 @@ class TestCliBasic:
     def test_login_default_uses_headless_qr_and_prints_link(self, monkeypatch):
         monkeypatch.setattr(
             "xhs_cli.qr_login.qrcode_login",
-            lambda **kwargs: {
-                "a1": "a1-http",
-                "webId": "webid-http",
-                "web_session": "session-http",
-            } if kwargs.keys() == {"prefer_browser_assisted", "print_link", "on_status"} and kwargs["prefer_browser_assisted"] is False and kwargs["print_link"] is True and callable(kwargs["on_status"]) else (_ for _ in ()).throw(AssertionError(kwargs)),
+            lambda **kwargs: _assert_qrcode_kwargs(True, **kwargs),
         )
 
         class FakeClient:
@@ -340,11 +349,7 @@ class TestCliBasic:
     def test_login_qrcode_http_uses_http_flow(self, monkeypatch):
         monkeypatch.setattr(
             "xhs_cli.qr_login.qrcode_login",
-            lambda **kwargs: {
-                "a1": "a1-http",
-                "webId": "webid-http",
-                "web_session": "session-http",
-            } if kwargs.keys() == {"prefer_browser_assisted", "print_link", "on_status"} and kwargs["prefer_browser_assisted"] is False and kwargs["print_link"] is False and callable(kwargs["on_status"]) else (_ for _ in ()).throw(AssertionError(kwargs)),
+            lambda **kwargs: _assert_qrcode_kwargs(False, **kwargs),
         )
 
         class FakeClient:

@@ -236,7 +236,6 @@ def _inspect_payload(cookies: dict[str, str] | None) -> dict[str, Any]:
     cookie_path = get_cookie_path()
     cookies = cookies or {}
 
-    present = {name: bool(cookies.get(name)) for name in AUTH_SENSITIVE_COOKIES}
     summary = {
         name: {
             "present": bool(cookies.get(name)),
