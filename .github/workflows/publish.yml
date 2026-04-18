@@ -38,6 +38,8 @@ jobs:
       - name: Attach artifacts to GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
           files: dist/*
 
   publish-pypi:

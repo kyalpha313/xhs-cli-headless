@@ -1,4 +1,4 @@
-# Release Notes Draft for v0.8.0
+# Release Notes Draft for v0.8.1
 
 ## Summary
 
