@@ -2,6 +2,11 @@
 
 ## 新功能
 
+- 默认 `xhs login` 收敛为面向无 GUI / 远程服务器场景的 headless 二维码登录
+- 新增认证工具链
+  - `xhs auth doctor`
+  - `xhs auth inspect`
+  - `xhs auth import --file`
 - 新增 `xhs auth import-fields`
   - 支持直接传入 `a1`、`web_session`、`webId` 等字段
   - 支持 `--interactive` 交互式粘贴浏览器 / F12 中复制的 cookie 字段
@@ -10,7 +15,7 @@
 
 ## Bug 修复
 
-- 修复 GitHub Actions 中的 Ruff 校验失败，恢复 CI 绿灯
+- 修复并验证纯 HTTP 二维码登录主路径
 - 修正二维码登录状态提示
   - 原先在“已确认但尚未完成会话”阶段会显示“登录已成功”
   - 现在改为更准确的“已确认，正在完成登录”
@@ -18,10 +23,4 @@
   - 明确引导用户使用 `xhs auth import --file` 或 `xhs auth import-fields --interactive`
 - 改进验证码冷却日志文案
   - 明确说明冷却只是避免重试风暴，不代表验证码已经解决
-
-## 仓库设置
-
-- 开启 GitHub Issues
-- 开启合并后自动删除分支
-- 关闭 Wiki
-- 关闭 Projects
+- 收窄默认发布命令面，只保留已验证稳定的能力

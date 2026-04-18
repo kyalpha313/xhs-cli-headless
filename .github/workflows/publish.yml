@@ -26,6 +26,9 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
 
+      - name: Clean dist
+        run: rm -f dist/*
+
       - name: Build package
         run: uv build
 
@@ -33,14 +36,18 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist-${{ github.ref_name }}
-          path: dist/*
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
 
       - name: Attach artifacts to GitHub release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
-          files: dist/*
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
 
   publish-pypi:
     needs: verify
@@ -58,6 +65,9 @@ jobs:
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v6
+
+      - name: Clean dist
+        run: rm -f dist/*
 
       - name: Build package
         run: uv build
