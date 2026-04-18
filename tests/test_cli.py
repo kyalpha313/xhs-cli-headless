@@ -212,6 +212,70 @@ class TestCliBasic:
         assert payload["data"]["imported_cookie_count"] == 3
         assert payload["data"]["validation"]["authenticated"] is True
 
+    def test_auth_import_fields_supports_direct_values(self, monkeypatch, tmp_path):
+        saved = []
+        monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "saved-cookies.json")
+        monkeypatch.setattr("xhs_cli.commands.auth.save_cookies", lambda cookies: saved.append(cookies))
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {
+                    "guest": False,
+                    "basic_info": {
+                        "user_id": "u-1",
+                        "nickname": "Alice",
+                        "red_id": "alice001",
+                    },
+                }
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(
+            cli,
+            [
+                "auth",
+                "import-fields",
+                "--a1",
+                "a1-token",
+                "--web-session",
+                "session-token",
+                "--webid",
+                "webid-token",
+                "--yaml",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert saved == [{
+            "a1": "a1-token",
+            "web_session": "session-token",
+            "webId": "webid-token",
+        }]
+        payload = yaml.safe_load(result.output)
+        assert payload["data"]["source"] == "fields"
+        assert payload["data"]["validation"]["authenticated"] is True
+
+    def test_auth_import_fields_requires_minimum_cookies(self):
+        result = runner.invoke(
+            cli,
+            ["auth", "import-fields", "--a1", "a1-token", "--yaml"],
+        )
+
+        assert result.exit_code != 0
+        payload = yaml.safe_load(result.output)
+        assert payload["ok"] is False
+        assert payload["error"]["code"] == "api_error"
+        assert "Missing required cookie fields" in payload["error"]["message"]
+
     def test_auth_inspect_masks_cookie_values(self, monkeypatch, tmp_path):
         monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "cookies.json")
         monkeypatch.setattr(

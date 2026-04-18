@@ -123,11 +123,14 @@ xhs comments <note_id_or_url> --yaml
   - 与默认 `xhs login` 属于同一路径
 - 导入已有登录态：`xhs auth import --file cookies.json`
   - 适合从其他环境迁移已验证 cookies
+- 从浏览器/F12 粘贴关键字段：`xhs auth import-fields --interactive`
+  - 适合在用户本机浏览器完成登录后，把关键 cookies 字段带回服务器
 
 说明：
 
 - `xhs status`、`xhs whoami`、`xhs read` 等命令默认只使用本地已保存登录态
 - 若当前没有有效登录态，请先执行 `xhs login` 或 `xhs auth import --file cookies.json`
+- 如果 `xhs login` 在扫码确认后触发额外验证码，请参考 [browser-cookie-recovery.md](file:///Users/bytedance/Documents/Trae/xhs-cli-headless/docs/browser-cookie-recovery.md)
 
 辅助命令：
 
@@ -148,6 +151,7 @@ xhs whoami
 xhs auth doctor
 xhs auth inspect
 xhs auth import --file cookies.json
+xhs auth import-fields --interactive
 xhs logout
 
 # Search / Reading
@@ -169,6 +173,14 @@ xhs delete-comment <note_id> <comment_id>
 xhs follow <user_id>
 xhs unfollow <user_id>
 ```
+
+### 登录恢复
+
+如果 `xhs login` 在扫码确认后仍被平台要求额外验证码：
+
+- 优先在你自己的浏览器里完成验证
+- 然后使用 `xhs auth import-fields --interactive`
+- 详细步骤见 [browser-cookie-recovery.md](file:///Users/bytedance/Documents/Trae/xhs-cli-headless/docs/browser-cookie-recovery.md)
 
 ### 结构化输出
 

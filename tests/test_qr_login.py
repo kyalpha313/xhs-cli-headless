@@ -3,7 +3,7 @@
 import pytest
 
 from xhs_cli.command_normalizers import normalize_xhs_user_payload
-from xhs_cli.exceptions import XhsApiError
+from xhs_cli.exceptions import NeedVerifyError, XhsApiError
 from xhs_cli.qr_login import BrowserQrLoginUnavailable, _normalize_browser_cookies, qrcode_login
 
 
@@ -131,6 +131,12 @@ class _PollingErrorQrClient(_FakeQrClient):
         raise RuntimeError("temporary network issue")
 
 
+class _VerifyOnCompletionQrClient(_FakeQrClient):
+    def complete_qr_login(self, qr_id, code):
+        self.complete_calls += 1
+        raise NeedVerifyError("124", "verify-uuid-1")
+
+
 def test_qrcode_login_completes_after_confirmation_and_saves_real_session(monkeypatch):
     saved = []
 
@@ -252,6 +258,38 @@ def test_qrcode_login_prints_link_when_requested(monkeypatch):
     qrcode_login(timeout_s=1, print_link=True, on_status=messages.append)
 
     assert any("QR URL: https://example.com/qr" in message for message in messages)
+
+
+def test_qrcode_login_uses_finalizing_status_after_confirmation(monkeypatch):
+    messages = []
+
+    monkeypatch.setattr("xhs_cli.qr_login.XhsClient", _FakeQrClient)
+    monkeypatch.setattr("xhs_cli.qr_login._generate_a1", lambda: "a1-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._generate_webid", lambda: "webid-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._display_qr_in_terminal", lambda data: True)
+    monkeypatch.setattr("xhs_cli.qr_login.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("xhs_cli.qr_login.save_cookies", lambda cookies: None)
+
+    qrcode_login(timeout_s=1, on_status=messages.append)
+
+    assert any("Confirmation received. Finalizing login..." in message for message in messages)
+    assert not any("Login confirmed!" in message for message in messages)
+
+
+def test_qrcode_login_surfaces_verify_after_confirmation(monkeypatch):
+    monkeypatch.setattr("xhs_cli.qr_login.XhsClient", _VerifyOnCompletionQrClient)
+    monkeypatch.setattr("xhs_cli.qr_login._generate_a1", lambda: "a1-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._generate_webid", lambda: "webid-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._display_qr_in_terminal", lambda data: True)
+    monkeypatch.setattr("xhs_cli.qr_login.time.sleep", lambda seconds: None)
+
+    with pytest.raises(XhsApiError) as exc_info:
+        qrcode_login(timeout_s=1)
+
+    message = str(exc_info.value)
+    assert "required an additional captcha" in message
+    assert "xhs auth import --file cookies.json" in message
+    assert "xhs auth import-fields --interactive" in message
 
 
 def test_qrcode_login_timeout_before_scan_has_actionable_hint(monkeypatch):

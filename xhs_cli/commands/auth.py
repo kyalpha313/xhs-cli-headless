@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -194,6 +195,32 @@ def _render_import_summary(data: dict[str, Any]) -> None:
         console.print(f"  current user: {validation['user']['nickname']}")
     elif validation.get("validation_error"):
         console.print(f"  validation error: {validation['validation_error']['message']}")
+
+
+def _import_cookie_fields(
+    *,
+    cookie_values: dict[str, str],
+    as_json: bool,
+    as_yaml: bool,
+    source: str,
+) -> None:
+    """Save imported cookie fields and print the standard validation summary."""
+    cookies = {name: value.strip() for name, value in cookie_values.items() if value and value.strip()}
+    if not cookies:
+        raise XhsApiError("No cookie fields were provided.")
+
+    save_cookies(cookies)
+    validation = _doctor_payload(cookies)
+    data = {
+        "imported": True,
+        "source": source,
+        "cookie_path": str(get_cookie_path()),
+        "imported_cookie_count": len(cookies),
+        "imported_cookie_names": sorted(cookies.keys()),
+        "validation": validation,
+    }
+    if not _emit_payload(data, as_json=as_json, as_yaml=as_yaml):
+        _render_import_summary(data)
 
 
 def _cookie_fingerprint(value: str) -> str:
@@ -461,19 +488,102 @@ def auth_import(cookie_file: Path, as_json: bool, as_yaml: bool):
         if not cookies:
             raise XhsApiError("Cookie file did not contain any usable cookie fields.")
 
-        save_cookies(cookies)
-        validation = _doctor_payload(cookies)
-        data = {
-            "imported": True,
-            "cookie_path": str(get_cookie_path()),
-            "imported_cookie_count": len(cookies),
-            "imported_cookie_names": sorted(cookies.keys()),
-            "validation": validation,
-        }
-        if not _emit_payload(data, as_json=as_json, as_yaml=as_yaml):
-            _render_import_summary(data)
+        _import_cookie_fields(
+            cookie_values=cookies,
+            as_json=as_json,
+            as_yaml=as_yaml,
+            source=f"file:{cookie_file}",
+        )
 
     handle_errors(_run, as_json=as_json, as_yaml=as_yaml, prefix="Cookie import failed")
+
+
+@auth.command("import-fields")
+@click.option("--a1", default="", help="Cookie field copied from browser storage")
+@click.option("--web-session", default="", help="Cookie field copied from browser storage")
+@click.option("--web-session-sec", default="", help="Optional cookie field copied from browser storage")
+@click.option("--webid", default="", help="Cookie field copied from browser storage")
+@click.option("--gid", default="", help="Optional cookie field copied from browser storage")
+@click.option("--websectiga", default="", help="Optional cookie field copied from browser storage")
+@click.option("--sec-poison-id", default="", help="Optional cookie field copied from browser storage")
+@click.option("--xsecappid", default="", help="Optional cookie field copied from browser storage")
+@click.option("--id-token", default="", help="Optional cookie field copied from browser storage")
+@click.option(
+    "--interactive",
+    is_flag=True,
+    default=False,
+    help="Prompt for missing fields so you can paste values copied from browser DevTools",
+)
+@structured_output_options
+def auth_import_fields(
+    a1: str,
+    web_session: str,
+    web_session_sec: str,
+    webid: str,
+    gid: str,
+    websectiga: str,
+    sec_poison_id: str,
+    xsecappid: str,
+    id_token: str,
+    interactive: bool,
+    as_json: bool,
+    as_yaml: bool,
+):
+    """Import cookies by pasting individual fields copied from the browser."""
+
+    def _run() -> None:
+        values = {
+            "a1": a1,
+            "web_session": web_session,
+            "web_session_sec": web_session_sec,
+            "webId": webid,
+            "gid": gid,
+            "websectiga": websectiga,
+            "sec_poison_id": sec_poison_id,
+            "xsecappid": xsecappid,
+            "id_token": id_token,
+        }
+
+        prompt_source = interactive or (sys.stdin.isatty() and not any(values.values()))
+        if prompt_source:
+            click.echo("Paste the cookie fields copied from your browser or DevTools.")
+            click.echo("Required fields: a1, web_session, webId")
+            values["a1"] = values["a1"] or click.prompt("a1", hide_input=True)
+            values["web_session"] = values["web_session"] or click.prompt("web_session", hide_input=True)
+            values["webId"] = values["webId"] or click.prompt("webId")
+            values["web_session_sec"] = values["web_session_sec"] or click.prompt(
+                "web_session_sec (optional)", default="", show_default=False, hide_input=True
+            )
+            values["gid"] = values["gid"] or click.prompt("gid (optional)", default="", show_default=False)
+            values["websectiga"] = values["websectiga"] or click.prompt(
+                "websectiga (optional)", default="", show_default=False, hide_input=True
+            )
+            values["sec_poison_id"] = values["sec_poison_id"] or click.prompt(
+                "sec_poison_id (optional)", default="", show_default=False, hide_input=True
+            )
+            values["xsecappid"] = values["xsecappid"] or click.prompt(
+                "xsecappid (optional)", default="", show_default=False
+            )
+            values["id_token"] = values["id_token"] or click.prompt(
+                "id_token (optional)", default="", show_default=False, hide_input=True
+            )
+
+        missing_required = [name for name in AUTH_REQUIRED_COOKIES if not values.get(name)]
+        if missing_required:
+            raise XhsApiError(
+                "Missing required cookie fields: "
+                + ", ".join(missing_required)
+                + ". Copy them from your browser and retry with `xhs auth import-fields --interactive`."
+            )
+
+        _import_cookie_fields(
+            cookie_values=values,
+            as_json=as_json,
+            as_yaml=as_yaml,
+            source="fields",
+        )
+
+    handle_errors(_run, as_json=as_json, as_yaml=as_yaml, prefix="Cookie field import failed")
 
 
 @auth.command("inspect")

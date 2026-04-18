@@ -113,7 +113,8 @@ class XhsClient(
             self._verify_count += 1
             cooldown = min(30, 5 * (2 ** (self._verify_count - 1)))
             logger.warning(
-                "Captcha triggered (count=%d), cooling down %.0fs before raising",
+                "Captcha triggered (count=%d). Cooling down %.0fs to avoid retry storms; "
+                "this does not solve the captcha challenge",
                 self._verify_count, cooldown,
             )
             self._request_delay = max(self._request_delay, self._base_request_delay * 2)

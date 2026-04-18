@@ -91,6 +91,17 @@ def _qr_polling_error(exc: Exception) -> XhsApiError:
     )
 
 
+def _qr_completion_verify_error(exc: NeedVerifyError) -> XhsApiError:
+    """Explain captcha requirements that happen after QR confirmation."""
+    return XhsApiError(
+        "QR code was scanned and confirmed, but Xiaohongshu required an additional captcha "
+        "before the logged-in session could be finalized. Complete the login in your browser, "
+        "then import the resulting cookies with `xhs auth import --file cookies.json` or "
+        "`xhs auth import-fields --interactive`. "
+        f"(type={exc.verify_type}, uuid={exc.verify_uuid})"
+    )
+
+
 def _apply_session_cookies(client: XhsClient, payload: dict[str, Any]) -> None:
     """Persist any session cookies returned by the QR login endpoints."""
     login_info = payload.get("login_info", {})
@@ -244,6 +255,8 @@ def _complete_confirmed_session(
         try:
             self_info_user_id = _resolved_user_id(client.get_self_info())
             last_self_info_user_id = self_info_user_id
+        except NeedVerifyError as exc:
+            raise _qr_completion_verify_error(exc) from exc
         except Exception as exc:
             logger.debug(
                 "QR post-confirm self info check failed attempt=%d: %s",
@@ -538,19 +551,22 @@ def _http_qrcode_login(
                 if code_status == QR_SCANNED:
                     _emit_status(on_status, "📲 Scanned! Waiting for confirmation...")
                 elif code_status == QR_CONFIRMED:
-                    _emit_status(on_status, "✅ Login confirmed!")
+                    _emit_status(on_status, "✅ Confirmation received. Finalizing login...")
 
             if code_status == QR_CONFIRMED:
                 confirmed_user_id = status_data.get("userId", "")
                 if not confirmed_user_id:
                     raise XhsApiError("QR login confirmed but no confirmed userId was returned.")
 
-                completion_data = _complete_confirmed_session(
-                    client,
-                    qr_id,
-                    code,
-                    confirmed_user_id,
-                )
+                try:
+                    completion_data = _complete_confirmed_session(
+                        client,
+                        qr_id,
+                        code,
+                        confirmed_user_id,
+                    )
+                except NeedVerifyError as exc:
+                    raise _qr_completion_verify_error(exc) from exc
                 user_id = _resolved_user_id(completion_data) or confirmed_user_id
                 cookies = _build_saved_cookies(a1, webid, client.cookies)
                 save_cookies(cookies)
