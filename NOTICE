@@ -1,0 +1,23 @@
+This repository is a maintained fork of:
+
+  jackwener/xiaohongshu-cli
+  https://github.com/jackwener/xiaohongshu-cli
+
+Current repository:
+
+  kyalpha313/xhs-cli-headless
+  https://github.com/kyalpha313/xhs-cli-headless
+
+This fork keeps the upstream reverse-engineered Xiaohongshu CLI foundation
+and introduces substantial changes for headless and agent-oriented usage,
+including but not limited to:
+
+- headless-first QR login as the default recommended login flow
+- auth diagnostics and session inspection commands
+- session import workflow for existing cookies
+- structured CLI output improvements
+- release-surface reduction to stable default commands only
+- documentation and release materials aligned to the stable command surface
+
+This NOTICE file is provided for attribution and project-history clarity.
+See LICENSE for the full Apache License 2.0 terms.

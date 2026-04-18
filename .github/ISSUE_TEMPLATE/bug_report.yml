@@ -6,7 +6,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: "Run `xhs --version` or `pip show xiaohongshu-cli | grep Version`"
+      description: "Run `xhs --version`"
       placeholder: "e.g. 1.0.0"
     validations:
       required: true

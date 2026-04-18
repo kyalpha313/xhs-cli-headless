@@ -8,11 +8,10 @@ from typing import TypeVar
 import click
 
 from ..client import XhsClient
-from ..cookies import get_cookies
+from ..cookies import load_saved_cookies
 from ..error_codes import error_code_for_exception
 from ..exceptions import (
     NoCookieError,
-    SessionExpiredError,
     XhsApiError,
 )
 from ..formatter import emit_error, print_error
@@ -32,22 +31,18 @@ def _cookie_source(ctx) -> str:
 
 
 def get_client(ctx, *, force_refresh: bool = False) -> XhsClient:
-    """Get a local client from the click context."""
-    _browser, cookies = get_cookies(_cookie_source(ctx), force_refresh=force_refresh)
+    """Get a local client from the saved session only."""
+    del force_refresh
+    cookies = load_saved_cookies()
+    if not cookies:
+        raise NoCookieError("saved")
     return XhsClient(cookies)
 
 
 def run_client_action(ctx, action: Callable[[XhsClient], T]) -> T:
-    """Run an authenticated client action and retry once with fresh browser cookies."""
-    try:
-        with get_client(ctx) as client:
-            return action(client)
-    except SessionExpiredError as exc:
-        try:
-            with get_client(ctx, force_refresh=True) as client:
-                return action(client)
-        except NoCookieError:
-            raise exc from None
+    """Run an authenticated client action using the saved session only."""
+    with get_client(ctx) as client:
+        return action(client)
 
 
 def handle_command(

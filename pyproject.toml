@@ -3,14 +3,15 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "xiaohongshu-cli"
-version = "0.6.4"
+name = "xhs-cli-headless"
+version = "0.8.0"
 description = "Headless-friendly Xiaohongshu CLI fork focused on QR login and automation"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [{ name = "jackwener", email = "jakevingoo@gmail.com" }]
-keywords = ["xiaohongshu", "xhs", "redbook", "cli", "api"]
+maintainers = [{ name = "kyalpha313", email = "kyalpha313@users.noreply.github.com" }]
+keywords = ["xiaohongshu", "xhs", "redbook", "cli", "api", "headless", "agent"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

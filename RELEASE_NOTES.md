@@ -1,20 +1,22 @@
-# Release Notes Draft
+# Release Notes Draft for v0.8.0
 
 ## Summary
 
-This release focuses on a stable headless CLI core for Xiaohongshu:
+This release focuses on a stable headless CLI core for Xiaohongshu and aligns the package for the next public distribution pass:
 
 - Pure-HTTP QR login is verified live and suitable for non-GUI environments.
 - Session tooling is expanded with `auth doctor`, `auth inspect`, and `auth import --file`.
 - Core read flows are validated live: `search`, `search-user`, `topics`, `feed`, `hot`, `read`, `comments`.
 - Core rollback-safe interactions are validated live: `like`, `favorite`, `comment`, `delete-comment`, `follow`, `unfollow`.
 - Release documentation and validation tooling are aligned with the real supported scope.
+- The distribution package name is now `xhs-cli-headless`.
 
 ## Highlights
 
 ### Headless Login
 
-- Added `xhs login --qrcode-http --print-link`
+- `xhs login` is now the default recommended headless QR login entry
+- `xhs login --qrcode-http` remains as the explicit pure-HTTP equivalent
 - Verified the pure-HTTP QR flow live:
   - QR creation
   - scan confirmation
@@ -40,11 +42,25 @@ This release focuses on a stable headless CLI core for Xiaohongshu:
 - `reply` now retries once on Xiaohongshu rate-limit code `-9043` and returns a clearer actionable error if throttling persists
 - Notification list failures now surface a clearer unsupported/fallback path instead of a vague raw API error
 
+### Release Surface
+
+- The default CLI help now exposes only the stable command surface
+- Hidden / unsupported commands are kept in source for future work, but are no longer part of the default release messaging
+- Non-login commands now use the saved session only, instead of silently re-extracting browser cookies
+
+### Packaging And Attribution
+
+- Added `LICENSE` and `NOTICE`
+- Added a repository release checklist
+- Updated package metadata to keep upstream author credit and current maintainer metadata
+- Added GitHub Release artifact publishing and prepared the workflow for future PyPI publishing
+
 ## Stable Scope
 
-The following commands are suitable for the first public release:
+The following commands are suitable for the current stable release:
 
-- `xhs login --qrcode-http --print-link`
+- `xhs login`
+- `xhs login --qrcode-http`
 - `xhs status`
 - `xhs whoami`
 - `xhs auth doctor`
@@ -66,14 +82,14 @@ The following commands are suitable for the first public release:
 
 ## Experimental / Limited
 
-- `xhs login` browser-cookie path
+- `xhs login --browser`
 - `xhs login --qrcode`
 - `xhs sub-comments`
 - `xhs reply`
 - `xhs post`
 - `xhs delete`
 
-These commands remain in the CLI, but should not be marketed as stable in the first release.
+These capabilities remain in source for future work, but should not be exposed or marketed as stable in the current release.
 
 ## Unsupported In Current Public Web API
 

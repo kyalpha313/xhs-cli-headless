@@ -24,9 +24,9 @@ Updated: 2026-04-17
   - `xhs status --yaml`
   - `xhs whoami --yaml`
   - `xhs search "小红书" --yaml`
-  - `xhs read 1 --yaml`
-  - `xhs comments 1 --yaml`
-  - `xhs login --qrcode-http --print-link`
+  - `xhs read <note_id_or_url> --yaml`
+  - `xhs comments <note_id_or_url> --yaml`
+  - `xhs login`
 
 ## Release Classification
 
@@ -34,9 +34,9 @@ Updated: 2026-04-17
 
 | Command | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| `login` | `tested-local` | CLI/unit tests + live fallback check | Browser extraction may surface expired browser sessions; the CLI now points users to `xhs login --qrcode-http --print-link`. |
+| `login` | `verified-live` | Real manual run + CLI/unit tests | Default release entry now uses the verified headless QR flow and prints the login link automatically. |
 | `login --qrcode` | `tested-local` | QR/unit tests | Browser-assisted QR path has local coverage; pure browser-assisted live run not re-verified manually. |
-| `login --qrcode-http --print-link` | `verified-live` | Real manual run | Pure-HTTP QR flow succeeded end-to-end, including scan, confirmation, cookie persistence, and session validation. |
+| `login --qrcode-http` | `verified-live` | Real manual run | Explicit pure-HTTP QR path is equivalent to the default release login flow. |
 | `status` | `verified-live` | Manual + smoke | Returned `authenticated: true` after imported cookies and after QR login. |
 | `whoami` | `verified-live` | Smoke | Passed real smoke test. |
 | `logout` | `tested-local` | CLI/unit tests | Not re-run manually to avoid discarding the current valid session during release prep. |
@@ -55,16 +55,16 @@ Updated: 2026-04-17
 | `hot` | `verified-live` | Smoke | Passed real smoke test. |
 | `read` | `verified-live` | Manual + smoke | Real API success, including short-index flow. |
 | `comments` | `verified-live` | Manual + smoke | Real API success, including short-index flow. |
-| `sub-comments` | `tested-local` | Local tests + token propagation fix | Now resolves note references and forwards `xsec_token`; still needs a stable live note/comment target for final confirmation. |
-| `user` | `known-broken` | Manual live repro | Current public web API returns `HTTP 406` / `{"code":-1,"success":false}`; CLI now surfaces `unsupported_operation`. |
-| `user-posts` | `known-broken` | Manual live repro | Same failure mode as `user`; CLI now surfaces `unsupported_operation`. |
+| `sub-comments` | `tested-local` | Local tests + token propagation fix | Retained in source only; not exposed in the default CLI surface for this release. |
+| `user` | `known-broken` | Manual live repro | Current public web API returns `HTTP 406` / `{"code":-1,"success":false}`; removed from the default CLI surface. |
+| `user-posts` | `known-broken` | Manual live repro | Same failure mode as `user`; removed from the default CLI surface. |
 
 ### Social / Collection
 
 | Command | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| `favorites` | `known-broken` | Live release report | Current public web API returned `code -1`; do not advertise for this release. |
-| `likes` | `known-broken` | Live release report | Current public web API returned `code -1`; do not advertise for this release. |
+| `favorites` | `known-broken` | Live release report | Current public web API returned `code -1`; removed from the default CLI surface. |
+| `likes` | `known-broken` | Live release report | Current public web API returned `code -1`; removed from the default CLI surface. |
 | `follow` | `verified-live` | Live release report | Real follow/unfollow rollback succeeded. |
 | `unfollow` | `verified-live` | Live release report | Real follow/unfollow rollback succeeded. |
 
@@ -76,7 +76,7 @@ Updated: 2026-04-17
 | `favorite` | `verified-live` | Live release report | Real favorite/unfavorite rollback succeeded. |
 | `unfavorite` | `verified-live` | Live release report | Real favorite/unfavorite rollback succeeded. |
 | `comment` | `verified-live` | Live release report | Real comment/delete-comment rollback succeeded. |
-| `reply` | `tested-local` | Local tests + rate-limit handling fix | Pre-fix live failure was `-9043` (rate limit). Command now retries once and returns a clearer actionable error on persistent throttling. |
+| `reply` | `tested-local` | Local tests + rate-limit handling fix | Retained in source only; not exposed in the default CLI surface for this release. |
 | `delete-comment` | `verified-live` | Live release report | Real comment delete rollback succeeded. |
 
 ### Creator
@@ -84,21 +84,22 @@ Updated: 2026-04-17
 | Command | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | `my-notes` | `verified-live` | Live release report | Real API success in the full release pass. |
-| `post` | `untested-high-risk` | Creator tests exist | Write operation; must be validated with a disposable note before release. |
-| `delete` | `untested-high-risk` | Creator tests exist | Creator delete can fail even when a regular session looks valid; keep behind a controlled pass only. |
+| `post` | `untested-high-risk` | Creator tests exist | Retained in source only; not exposed in the default CLI surface for this release. |
+| `delete` | `untested-high-risk` | Creator tests exist | Retained in source only; not exposed in the default CLI surface for this release. |
 
 ### Notifications
 
 | Command | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| `notifications` | `known-broken` | Live release report + clearer fallback | Current public web API returned `code -1`; CLI now surfaces `unsupported_operation` and suggests `xhs unread`. |
+| `notifications` | `known-broken` | Live release report + clearer fallback | Current public web API returned `code -1`; removed from the default CLI surface. |
 | `unread` | `verified-live` | Live release report | Real API success in the full release pass. |
 
 ## Release Recommendation
 
 ### Safe To Ship First
 
-- `login --qrcode-http --print-link`
+- `login`
+- `login --qrcode-http`
 - `status`
 - `whoami`
 - `auth doctor`
@@ -135,15 +136,15 @@ Updated: 2026-04-17
 - `reply`
 - `post`
 - `delete`
-- browser cookie extraction path of `login`
+- browser cookie extraction path of `login --browser`
 - browser-assisted `login --qrcode`
 
 ## Suggested Final Release Pass
 
 1. Re-run `uv run pytest -m smoke tests/test_smoke.py -q`
-2. Manually verify `login --qrcode-http --print-link`
+2. Manually verify `login`
 3. Run `uv run python scripts/live_release_validation.py > live_release_report.yaml`
-4. Decide whether to hide or clearly label `user` and `user-posts`
+4. Confirm removed commands stay out of the default CLI surface
 5. Run creator write tests only when delete rollback is verified for the current session type:
    `uv run python scripts/live_release_validation.py --enable-creator-write-tests`
 6. Run browser cookie extraction check only as a separate optional pass:

@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: Build And Publish
 
 on:
   push:
@@ -10,7 +10,37 @@ jobs:
   verify:
     uses: ./.github/workflows/ci.yml
 
-  publish:
+  release-assets:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Build package
+        run: uv build
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.ref_name }}
+          path: dist/*
+
+      - name: Attach artifacts to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+
+  publish-pypi:
     needs: verify
     runs-on: ubuntu-latest
     environment: pypi

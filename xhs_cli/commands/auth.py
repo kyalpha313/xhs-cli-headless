@@ -269,40 +269,56 @@ def auth():
     "--cookie-source",
     type=str,
     default=None,
-    help="Browser to read cookies from (default: auto-detect all installed browsers)",
+    hidden=True,
+    help="Browser to read cookies from when using --browser (default: auto-detect all installed browsers)",
 )
 @structured_output_options
+@click.option(
+    "--browser",
+    "use_browser",
+    is_flag=True,
+    default=False,
+    hidden=True,
+    help="Extract cookies from a logged-in browser instead of QR login",
+)
 @click.option("--qrcode", "use_qrcode", is_flag=True, default=False,
-              help="Login via QR code (scan with Xiaohongshu app)")
+              hidden=True,
+              help="Use browser-assisted QR login instead of the default headless QR flow")
 @click.option("--qrcode-http", "use_qrcode_http", is_flag=True, default=False,
-              help="Force the legacy pure-HTTP QR login flow")
+              help="Use the pure-HTTP QR login flow explicitly (same backend as default xhs login)")
 @click.option("--print-link", is_flag=True, default=False,
-              help="Always print the QR login URL in addition to terminal QR rendering")
+              help="Print the QR login URL in addition to terminal QR rendering")
 @click.pass_context
 def login(
     ctx,
     cookie_source: str | None,
     as_json: bool,
     as_yaml: bool,
+    use_browser: bool,
     use_qrcode: bool,
     use_qrcode_http: bool,
     print_link: bool,
 ):
-    """Log in by extracting cookies from browser, or via QR code."""
+    """Log in with headless QR by default."""
 
     def _qr_status(msg: str) -> None:
         click.echo(msg, err=as_json or as_yaml)
 
-    if print_link and not (use_qrcode or use_qrcode_http):
-        raise click.UsageError("--print-link must be used with --qrcode or --qrcode-http.")
+    if use_browser and (use_qrcode or use_qrcode_http):
+        raise click.UsageError("--browser cannot be combined with --qrcode or --qrcode-http.")
 
-    if use_qrcode or use_qrcode_http:
+    if print_link and use_browser:
+        raise click.UsageError("--print-link cannot be used with --browser.")
+
+    if not use_browser:
         def _login_with_qrcode() -> None:
             from ..qr_login import qrcode_login
 
+            prefer_browser_assisted = use_qrcode and not use_qrcode_http
+            effective_print_link = print_link or (not use_qrcode and not use_qrcode_http)
             cookies = qrcode_login(
-                prefer_browser_assisted=not use_qrcode_http,
-                print_link=print_link,
+                prefer_browser_assisted=prefer_browser_assisted,
+                print_link=effective_print_link,
                 on_status=_qr_status,
             )
 
@@ -333,7 +349,7 @@ def login(
         )
         return
 
-    # Browser cookie extraction (default)
+    # Explicit browser cookie extraction
     if cookie_source is None:
         cookie_source = ctx.obj.get("cookie_source", "auto") if ctx.obj else "auto"
 
@@ -346,7 +362,7 @@ def login(
         except SessionExpiredError as exc:
             raise XhsApiError(
                 f"Browser cookies were extracted from {browser}, but the session is expired. "
-                "Try: xhs login --qrcode-http --print-link"
+                "Try: xhs login"
             ) from exc
         user = normalize_xhs_user_payload(info)
 
@@ -359,7 +375,7 @@ def login(
         if not _is_valid_login(user):
             raise XhsApiError(
                 f"Browser cookies were extracted from {browser}, but the session appears expired or invalid "
-                "(guest or incomplete profile). Try: xhs login --qrcode-http --print-link"
+                "(guest or incomplete profile). Try: xhs login"
             )
 
         print_success(f"Cookies extracted from {browser}")

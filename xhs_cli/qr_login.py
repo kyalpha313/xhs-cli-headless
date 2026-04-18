@@ -1,12 +1,13 @@
 """QR code login for Xiaohongshu.
 
 Supports two backends:
-1. Browser-assisted login via Camoufox.  The browser performs the real
+1. Pure-HTTP login.  The CLI creates and polls the QR session directly,
+   renders the QR code in the terminal, and persists the authenticated
+   cookies after confirmation.
+2. Browser-assisted login via Camoufox.  The browser performs the real
    QR completion flow, while the CLI renders the QR code in the terminal
    from the browser's ``qrcode/create`` response and exports cookies after
    login succeeds.
-2. Legacy pure-HTTP login flow.  This remains as a fallback when the
-   browser backend is unavailable.
 """
 
 from __future__ import annotations
@@ -75,9 +76,9 @@ def _qr_timeout_error(*, last_status: int, timeout_s: int, browser_assisted: boo
         detail = "QR login did not complete before timeout."
 
     if browser_assisted:
-        hint = "Retry with: xhs login --qrcode or force headless mode with: xhs login --qrcode-http --print-link"
+        hint = "Retry with: xhs login --qrcode or switch back to the default headless flow with: xhs login"
     else:
-        hint = "Retry with: xhs login --qrcode-http --print-link"
+        hint = "Retry with: xhs login"
 
     return XhsApiError(f"{detail} Timeout={timeout_s}s. {hint}")
 
@@ -86,7 +87,7 @@ def _qr_polling_error(exc: Exception) -> XhsApiError:
     """Build an actionable error after repeated QR polling failures."""
     return XhsApiError(
         "QR status polling failed repeatedly. Check your network connection and retry with: "
-        f"xhs login --qrcode-http --print-link (last error: {exc})"
+        f"xhs login (last error: {exc})"
     )
 
 
