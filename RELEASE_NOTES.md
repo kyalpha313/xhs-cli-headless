@@ -1,26 +1,23 @@
-# v0.8.4
+# v0.8.5
 
 ## 新功能
 
-- 默认 `xhs login` 收敛为面向无 GUI / 远程服务器场景的 headless 二维码登录
-- 新增认证工具链
-  - `xhs auth doctor`
-  - `xhs auth inspect`
-  - `xhs auth import --file`
-- 新增 `xhs auth import-fields`
-  - 支持直接传入 `a1`、`web_session`、`webId` 等字段
-  - 支持 `--interactive` 交互式粘贴浏览器 / F12 中复制的 cookie 字段
-- 新增浏览器 / F12 登录恢复文档 `docs/browser-cookie-recovery.md`
-  - 说明当扫码确认后触发额外验证码时，如何在用户自己的浏览器中完成验证，再把字段导回服务器 CLI
+- 默认开放 `xhs board`
+  - 支持直接读取收藏专辑 / board 链接
+  - 在当前 API 不稳定的情况下，自动走 HTML fallback
+- 默认开放 `xhs reply`
+  - 现在可以直接回复指定评论
+- `xhs auth doctor` 增强
+  - 现在会分别检查主站和 creator 两类登录状态
+- `xhs auth import-fields --interactive` 体验改进
+  - 所有字段都改为普通输入，方便直接粘贴浏览器 / F12 中的 cookie 字段
 
 ## Bug 修复
 
-- 修复并验证纯 HTTP 二维码登录主路径
-- 修正二维码登录状态提示
-  - 原先在“已确认但尚未完成会话”阶段会显示“登录已成功”
-  - 现在改为更准确的“已确认，正在完成登录”
-- 改进二维码登录触发验证码后的错误提示
-  - 明确引导用户使用 `xhs auth import --file` 或 `xhs auth import-fields --interactive`
-- 改进验证码冷却日志文案
-  - 明确说明冷却只是避免重试风暴，不代表验证码已经解决
-- 收窄默认发布命令面，只保留已验证稳定的能力
+- 重新梳理并校准当前默认命令面
+  - 公开已验证可用的 `board`、`reply`
+  - 继续隐藏当前未稳定的能力，避免误调用
+- 改进能力状态文档
+  - 新增统一的能力状态总览，便于查看哪些命令当前支持、隐藏或已知失败
+- 改进错误表达
+  - 对当前不可用的部分 creator 能力，给出更明确的提示，不再把它们笼统显示成普通登录失效

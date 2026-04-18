@@ -22,7 +22,7 @@ from .cookies import (
     invalidate_note_context,
 )
 from .exceptions import NeedVerifyError, UnsupportedOperationError, XhsApiError
-from .html_parser import extract_note_from_html
+from .html_parser import extract_board_from_html, extract_note_from_html
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +194,32 @@ def get_search_session_stats() -> dict[str, Any]:
 class ReadingEndpointsMixin:
     """Read-only note, profile, and discovery endpoints."""
 
+    def _main_api_get_with_fallback_profiles(
+        self,
+        uri: str,
+        params: dict[str, Any],
+        fallback_profiles: tuple[str, ...] = ("windows",),
+    ) -> Any:
+        try:
+            return self._main_api_get(uri, params)
+        except XhsApiError as exc:
+            if exc.code != -1:
+                raise
+            last_exc = exc
+        for profile in fallback_profiles:
+            logger.debug(
+                "Retrying %s with main API signing profile %s after code -1",
+                uri,
+                profile,
+            )
+            try:
+                return self._main_api_get(uri, params, sign_profile=profile)
+            except XhsApiError as exc:
+                if exc.code != -1:
+                    raise
+                last_exc = exc
+        raise last_exc
+
     def _search_request_id(self) -> str:
         return f"{random.randint(1_000_000_000, 2_147_483_647)}-{int(time.time() * 1000)}"
 
@@ -213,6 +239,20 @@ class ReadingEndpointsMixin:
             url,
             headers={
                 "user-agent": USER_AGENT,
+                "referer": f"{HOME_URL}/",
+                "cookie": cookies_to_string(self.cookies),
+            },
+        )
+        return resp.text
+
+    def _fetch_board_html(self, board_id: str) -> str:
+        url = f"{HOME_URL}/board/{board_id}"
+        resp = self._request_with_retry(
+            "GET",
+            url,
+            headers={
+                "user-agent": USER_AGENT,
+                "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "referer": f"{HOME_URL}/",
                 "cookie": cookies_to_string(self.cookies),
             },
@@ -259,10 +299,14 @@ class ReadingEndpointsMixin:
         return self._main_api_get("/api/sns/web/v2/user/me")
 
     def get_user_info(self, user_id: str) -> dict[str, Any]:
+        params = {
+            "target_user_id": user_id,
+        }
         try:
-            return self._main_api_get("/api/sns/web/v1/user/otherinfo", {
-                "target_user_id": user_id,
-            })
+            return self._main_api_get_with_fallback_profiles(
+                "/api/sns/web/v1/user/otherinfo",
+                params,
+            )
         except XhsApiError as exc:
             if exc.code == -1:
                 raise UnsupportedOperationError(
@@ -273,13 +317,17 @@ class ReadingEndpointsMixin:
             raise
 
     def get_user_notes(self, user_id: str, cursor: str = "") -> dict[str, Any]:
+        params = {
+            "num": 30,
+            "cursor": cursor,
+            "user_id": user_id,
+            "image_scenes": "FD_WM_WEBP",
+        }
         try:
-            return self._main_api_get("/api/sns/web/v1/user_posted", {
-                "num": 30,
-                "cursor": cursor,
-                "user_id": user_id,
-                "image_scenes": "FD_WM_WEBP",
-            })
+            return self._main_api_get_with_fallback_profiles(
+                "/api/sns/web/v1/user_posted",
+                params,
+            )
         except XhsApiError as exc:
             if exc.code == -1:
                 raise UnsupportedOperationError(
@@ -358,6 +406,11 @@ class ReadingEndpointsMixin:
         """Fetch note by parsing server-rendered HTML (no xsec_token required)."""
         html = self._fetch_note_html(note_id, xsec_token=xsec_token, xsec_source=xsec_source)
         return extract_note_from_html(html, note_id)
+
+    def get_board_from_html(self, board_id: str) -> dict[str, Any]:
+        """Fetch and parse a board page without relying on the broken board API."""
+        html = self._fetch_board_html(board_id)
+        return extract_board_from_html(html, board_id)
 
     def get_note_detail(
         self,
@@ -647,18 +700,74 @@ class CreatorEndpointsMixin:
         })
 
     def delete_note(self, note_id: str) -> dict[str, Any]:
-        try:
-            return self._creator_post("/api/galaxy/creator/note/delete", {
-                "note_id": note_id,
-            })
-        except XhsApiError as exc:
-            response = exc.response if isinstance(exc.response, dict) else {}
-            if response.get("status") == 404 or "404" in str(exc):
-                raise UnsupportedOperationError(
-                    "Delete note is currently unavailable from the public web API. "
-                    "The command remains experimental until the new endpoint is re-captured."
-                ) from None
-            raise
+        candidates = [
+            (
+                "/api/galaxy/creator/note/delete",
+                {"note_id": note_id},
+                {"referer": f"{CREATOR_HOST}/publish/notes"},
+                "POST",
+            ),
+            (
+                "/api/galaxy/creator/note/delete",
+                {"noteId": note_id},
+                {"referer": f"{CREATOR_HOST}/publish/notes"},
+                "POST",
+            ),
+            (
+                "/api/galaxy/creator/note/delete",
+                {"id": note_id},
+                {"referer": f"{CREATOR_HOST}/publish/notes"},
+                "POST",
+            ),
+            (
+                "/api/galaxy/creator/note/remove",
+                {"note_id": note_id},
+                {"referer": f"{CREATOR_HOST}/publish/notes"},
+                "POST",
+            ),
+            (
+                "/api/galaxy/creator/note/delete",
+                {"note_id": note_id},
+                {"referer": f"{CREATOR_HOST}/publish/notes"},
+                "DELETE",
+            ),
+        ]
+        last_exc: XhsApiError | None = None
+        saw_login_expired = False
+        for uri, payload, headers, method in candidates:
+            try:
+                return self._creator_post(
+                    uri,
+                    payload,
+                    header_overrides=headers,
+                    method=method,
+                )
+            except XhsApiError as exc:
+                response = exc.response if isinstance(exc.response, dict) else {}
+                if response.get("status") == 404 or "404" in str(exc):
+                    continue
+                if response.get("result") == -100 or response.get("code") == -1:
+                    msg = str(response.get("msg") or "")
+                    saw_login_expired = (
+                        saw_login_expired
+                        or response.get("result") == -100
+                        or "登录已过期" in msg
+                        or "\\u767b\\u5f55\\u5df2\\u8fc7\\u671f" in str(exc)
+                    )
+                last_exc = exc
+                continue
+        if saw_login_expired:
+            raise UnsupportedOperationError(
+                "Delete note is currently unavailable from the public web API. "
+                "The creator note list is still readable, but current delete endpoint variants "
+                "return creator-side login expired errors and likely need to be re-captured."
+            ) from None
+        if last_exc is not None:
+            raise last_exc
+        raise UnsupportedOperationError(
+            "Delete note is currently unavailable from the public web API. "
+            "The command remains experimental until the new endpoint is re-captured."
+        )
 
     def get_creator_note_list(self, tab: int = 0, page: int = 0) -> dict[str, Any]:
         return self._creator_get("/api/galaxy/v2/creator/note/user/posted", {
@@ -677,14 +786,14 @@ class SocialEndpointsMixin:
         return self._main_api_post("/api/sns/web/v1/user/unfollow", {"target_user_id": user_id})
 
     def get_user_favorites(self, user_id: str, cursor: str = "") -> dict[str, Any]:
-        return self._main_api_get("/api/sns/web/v2/note/collect/page", {
+        return self._main_api_get_with_fallback_profiles("/api/sns/web/v2/note/collect/page", {
             "user_id": user_id,
             "cursor": cursor,
             "num": 30,
         })
 
     def get_user_likes(self, user_id: str, cursor: str = "") -> dict[str, Any]:
-        return self._main_api_get("/api/sns/web/v1/note/like/page", {
+        return self._main_api_get_with_fallback_profiles("/api/sns/web/v1/note/like/page", {
             "user_id": user_id,
             "cursor": cursor,
             "num": 30,
@@ -699,7 +808,7 @@ class NotificationEndpointsMixin:
 
     def get_notification_mentions(self, cursor: str = "", num: int = 20) -> dict[str, Any]:
         try:
-            return self._main_api_get("/api/sns/web/v1/you/mentions", {
+            return self._main_api_get_with_fallback_profiles("/api/sns/web/v1/you/mentions", {
                 "num": num,
                 "cursor": cursor,
             })
@@ -713,7 +822,7 @@ class NotificationEndpointsMixin:
 
     def get_notification_likes(self, cursor: str = "", num: int = 20) -> dict[str, Any]:
         try:
-            return self._main_api_get("/api/sns/web/v1/you/likes", {
+            return self._main_api_get_with_fallback_profiles("/api/sns/web/v1/you/likes", {
                 "num": num,
                 "cursor": cursor,
             })
@@ -727,7 +836,7 @@ class NotificationEndpointsMixin:
 
     def get_notification_connections(self, cursor: str = "", num: int = 20) -> dict[str, Any]:
         try:
-            return self._main_api_get("/api/sns/web/v1/you/connections", {
+            return self._main_api_get_with_fallback_profiles("/api/sns/web/v1/you/connections", {
                 "num": num,
                 "cursor": cursor,
             })

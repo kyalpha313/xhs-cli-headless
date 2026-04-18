@@ -112,6 +112,49 @@ def _auth_recommendation(*, has_cookies: bool, missing_required: list[str], auth
     return "refresh_or_relogin"
 
 
+def _domain_status_payload(
+    *,
+    name: str,
+    available: bool = True,
+    authenticated: bool = False,
+    login_status: str = "unknown",
+    validation_error: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "name": name,
+        "available": available,
+        "authenticated": authenticated,
+        "login_status": login_status,
+    }
+    if validation_error:
+        payload["validation_error"] = validation_error
+    return payload
+
+
+def _validate_main_domain(cookies: dict[str, str]) -> dict[str, Any]:
+    with XhsClient(cookies) as client:
+        info = client.get_self_info()
+    user = normalize_xhs_user_payload(info)
+    authenticated = _is_valid_login(user)
+    payload = _domain_status_payload(
+        name="main",
+        authenticated=authenticated,
+        login_status="valid" if authenticated else "invalid",
+    )
+    payload["user"] = user
+    return payload
+
+
+def _validate_creator_domain(cookies: dict[str, str]) -> dict[str, Any]:
+    with XhsClient(cookies) as client:
+        client.get_creator_note_list(page=0)
+    return _domain_status_payload(
+        name="creator",
+        authenticated=True,
+        login_status="valid",
+    )
+
+
 def _doctor_payload(cookies: dict[str, str] | None) -> dict[str, Any]:
     """Build the diagnostic payload for the saved authentication state."""
     cookie_path = get_cookie_path()
@@ -129,6 +172,10 @@ def _doctor_payload(cookies: dict[str, str] | None) -> dict[str, Any]:
         "recommended_cookies_present": present_recommended,
         "login_status": "missing",
         "authenticated": False,
+        "domains": {
+            "main": _domain_status_payload(name="main", available=bool(cookies), login_status="missing"),
+            "creator": _domain_status_payload(name="creator", available=bool(cookies), login_status="missing"),
+        },
         "recommended_action": _auth_recommendation(
             has_cookies=bool(cookies),
             missing_required=missing_required,
@@ -141,24 +188,48 @@ def _doctor_payload(cookies: dict[str, str] | None) -> dict[str, Any]:
 
     if missing_required:
         payload["login_status"] = "partial"
+        payload["domains"]["main"]["login_status"] = "partial"
+        payload["domains"]["creator"]["login_status"] = "partial"
 
     try:
-        with XhsClient(cookies) as client:
-            info = client.get_self_info()
-        user = normalize_xhs_user_payload(info)
-        payload["user"] = user
-        payload["authenticated"] = _is_valid_login(user)
-        if payload["authenticated"]:
-            payload["login_status"] = "valid"
-        elif payload["login_status"] == "missing":
-            payload["login_status"] = "invalid"
+        main_domain = _validate_main_domain(cookies)
+        payload["domains"]["main"] = main_domain
+        payload["user"] = main_domain.get("user", {})
+        payload["authenticated"] = bool(main_domain["authenticated"])
+        payload["login_status"] = main_domain["login_status"]
     except XhsApiError as exc:
-        if payload["login_status"] == "missing":
-            payload["login_status"] = "invalid"
-        payload["validation_error"] = {
+        validation_error = {
             "code": exc.code or "api_error",
             "message": str(exc),
         }
+        payload["domains"]["main"] = _domain_status_payload(
+            name="main",
+            authenticated=False,
+            login_status="invalid" if payload["login_status"] == "missing" else payload["login_status"],
+            validation_error=validation_error,
+        )
+        if payload["login_status"] == "missing":
+            payload["login_status"] = "invalid"
+        payload["validation_error"] = validation_error
+
+    try:
+        payload["domains"]["creator"] = _validate_creator_domain(cookies)
+    except (AttributeError, NotImplementedError):
+        payload["domains"]["creator"] = _domain_status_payload(
+            name="creator",
+            available=False,
+            login_status="unknown",
+        )
+    except XhsApiError as exc:
+        payload["domains"]["creator"] = _domain_status_payload(
+            name="creator",
+            authenticated=False,
+            login_status="invalid" if payload["domains"]["creator"]["login_status"] == "missing" else payload["domains"]["creator"]["login_status"],
+            validation_error={
+                "code": exc.code or "api_error",
+                "message": str(exc),
+            },
+        )
 
     payload["recommended_action"] = _auth_recommendation(
         has_cookies=bool(cookies),
@@ -182,6 +253,12 @@ def _render_doctor_summary(data: dict[str, Any]) -> None:
         console.print(f"  current user: {data['user']['nickname']}")
     if data.get("validation_error"):
         console.print(f"  validation error: {data['validation_error']['message']}")
+    domains = data.get("domains", {})
+    if isinstance(domains, dict):
+        if "main" in domains:
+            console.print(f"  main api: {domains['main'].get('login_status', 'unknown')}")
+        if "creator" in domains:
+            console.print(f"  creator api: {domains['creator'].get('login_status', 'unknown')}")
     console.print(f"  recommended action: {data['recommended_action']}")
 
 
@@ -547,24 +624,24 @@ def auth_import_fields(
         if prompt_source:
             click.echo("Paste the cookie fields copied from your browser or DevTools.")
             click.echo("Required fields: a1, web_session, webId")
-            values["a1"] = values["a1"] or click.prompt("a1", hide_input=True)
-            values["web_session"] = values["web_session"] or click.prompt("web_session", hide_input=True)
+            values["a1"] = values["a1"] or click.prompt("a1")
+            values["web_session"] = values["web_session"] or click.prompt("web_session")
             values["webId"] = values["webId"] or click.prompt("webId")
             values["web_session_sec"] = values["web_session_sec"] or click.prompt(
-                "web_session_sec (optional)", default="", show_default=False, hide_input=True
+                "web_session_sec (optional)", default="", show_default=False
             )
             values["gid"] = values["gid"] or click.prompt("gid (optional)", default="", show_default=False)
             values["websectiga"] = values["websectiga"] or click.prompt(
-                "websectiga (optional)", default="", show_default=False, hide_input=True
+                "websectiga (optional)", default="", show_default=False
             )
             values["sec_poison_id"] = values["sec_poison_id"] or click.prompt(
-                "sec_poison_id (optional)", default="", show_default=False, hide_input=True
+                "sec_poison_id (optional)", default="", show_default=False
             )
             values["xsecappid"] = values["xsecappid"] or click.prompt(
                 "xsecappid (optional)", default="", show_default=False
             )
             values["id_token"] = values["id_token"] or click.prompt(
-                "id_token (optional)", default="", show_default=False, hide_input=True
+                "id_token (optional)", default="", show_default=False
             )
 
         missing_required = [name for name in AUTH_REQUIRED_COOKIES if not values.get(name)]

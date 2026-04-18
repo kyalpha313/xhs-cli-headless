@@ -1,159 +1,168 @@
-# Release Test Matrix
+# Release Validation Evidence
 
-Updated: 2026-04-17
+Updated: 2026-04-18
 
-## Legend
+这份文档只保留“验证证据”，不再承担最终状态口径职责。
 
-- `verified-live`: Ran successfully against the real Xiaohongshu API in this workspace/session.
-- `tested-local`: Covered by local/unit tests in this workspace, but not re-verified manually against the live API in this release pass.
-- `known-broken`: Reproduced as unavailable or rejected by the current public web API.
-- `untested-high-risk`: Exposed by the CLI, but not yet verified in this release pass. Requires validation before release.
+- 命令是否默认支持、是否隐藏、是否已知失败，请以 [capability-status.md](file:///Users/bytedance/Documents/Trae/xhs-cli-headless/docs/capability-status.md) 为准。
+- 这里仅记录本仓库当前已经跑过的自动化测试、真实验证、失败复现与关键观察。
 
-## Evidence Summary
+## 自动化证据
 
-- Full local regression subsets passed:
+### 单元 / CLI / cookies / 登录子集
+
+- 命令：
   - `uv run pytest tests/test_qr_login.py tests/test_cli.py tests/test_client.py tests/test_cookies.py -q`
-  - Result: `93 passed`
-- Real CLI smoke tests passed:
+- 结果：
+  - `93 passed`
+
+### Smoke 子集
+
+- 命令：
   - `uv run pytest -m smoke tests/test_smoke.py -q`
-  - Result: `11 passed`
-- Real manual validation completed in this workspace:
-  - `xhs auth import --file xhs_cli/test/cookies.json --yaml`
-  - `xhs auth doctor --yaml`
+- 结果：
+  - `11 passed`
+
+### 近期定向回归
+
+- 命令：
+  - `uv run pytest tests/test_cli.py -q`
+  - `uv run pytest tests/test_client.py -q`
+- 结果：
+  - `49 passed`
+  - `26 passed`
+
+## 真实成功证据
+
+### 认证与会话
+
+- 已真实跑通：
+  - `xhs login`
+  - `xhs auth doctor --json`
   - `xhs auth inspect --yaml`
   - `xhs status --yaml`
   - `xhs whoami --yaml`
+- 关键观察：
+  - 当前 `auth doctor` 已支持 `main / creator` 双域校验
+  - 当前真实会话下两域都可达到 `valid`
+
+### 搜索 / 阅读 / 评论
+
+- 已真实跑通：
   - `xhs search "小红书" --yaml`
+  - `xhs search-user <keyword>`
+  - `xhs topics <keyword>`
+  - `xhs feed`
+  - `xhs hot`
   - `xhs read <note_id_or_url> --yaml`
   - `xhs comments <note_id_or_url> --yaml`
-  - `xhs login`
+- 关键观察：
+  - `comments` 主链路可用
+  - 评论链路里可以拿到真实 `root_comment_id`
 
-## Release Classification
+### 社交与互动
 
-### Auth
+- 已真实跑通：
+  - `xhs like`
+  - `xhs favorite`
+  - `xhs unfavorite`
+  - `xhs comment`
+  - `xhs reply`
+  - `xhs delete-comment`
+  - `xhs follow`
+  - `xhs unfollow`
+- 关键观察：
+  - `reply` 已在作者自己的笔记上完成真实写操作验证
+  - `delete-comment` 已完成真实回滚验证
 
-| Command | Status | Evidence | Notes |
-| --- | --- | --- | --- |
-| `login` | `verified-live` | Real manual run + CLI/unit tests | Default release entry now uses the verified headless QR flow and prints the login link automatically. |
-| `login --qrcode` | `tested-local` | QR/unit tests | Browser-assisted QR path has local coverage; pure browser-assisted live run not re-verified manually. |
-| `login --qrcode-http` | `verified-live` | Real manual run | Explicit pure-HTTP QR path is equivalent to the default release login flow. |
-| `status` | `verified-live` | Manual + smoke | Returned `authenticated: true` after imported cookies and after QR login. |
-| `whoami` | `verified-live` | Smoke | Passed real smoke test. |
-| `logout` | `tested-local` | CLI/unit tests | Not re-run manually to avoid discarding the current valid session during release prep. |
-| `auth doctor` | `verified-live` | Manual | Validated both imported cookies and QR-created session. |
-| `auth inspect` | `verified-live` | Manual | Verified masked cookie summary on the saved local session. |
-| `auth import --file` | `verified-live` | Manual | Imported the provided `cookies.json` successfully and validated the resulting session. |
+### 收藏专辑
 
-### Read-only Discovery / Reading
-
-| Command | Status | Evidence | Notes |
-| --- | --- | --- | --- |
-| `search` | `verified-live` | Manual + smoke | Real API success. |
-| `search-user` | `verified-live` | Live release report | Real API success in the full release pass. |
-| `topics` | `verified-live` | Smoke | Passed real smoke test. |
-| `feed` | `verified-live` | Smoke | Passed real smoke test. |
-| `hot` | `verified-live` | Smoke | Passed real smoke test. |
-| `read` | `verified-live` | Manual + smoke | Real API success, including short-index flow. |
-| `comments` | `verified-live` | Manual + smoke | Real API success, including short-index flow. |
-| `sub-comments` | `tested-local` | Local tests + token propagation fix | Retained in source only; not exposed in the default CLI surface for this release. |
-| `user` | `known-broken` | Manual live repro | Current public web API returns `HTTP 406` / `{"code":-1,"success":false}`; removed from the default CLI surface. |
-| `user-posts` | `known-broken` | Manual live repro | Same failure mode as `user`; removed from the default CLI surface. |
-
-### Social / Collection
-
-| Command | Status | Evidence | Notes |
-| --- | --- | --- | --- |
-| `favorites` | `known-broken` | Live release report | Current public web API returned `code -1`; removed from the default CLI surface. |
-| `likes` | `known-broken` | Live release report | Current public web API returned `code -1`; removed from the default CLI surface. |
-| `follow` | `verified-live` | Live release report | Real follow/unfollow rollback succeeded. |
-| `unfollow` | `verified-live` | Live release report | Real follow/unfollow rollback succeeded. |
-
-### Interactions
-
-| Command | Status | Evidence | Notes |
-| --- | --- | --- | --- |
-| `like` | `verified-live` | Live release report | Real like/unlike rollback succeeded. |
-| `favorite` | `verified-live` | Live release report | Real favorite/unfavorite rollback succeeded. |
-| `unfavorite` | `verified-live` | Live release report | Real favorite/unfavorite rollback succeeded. |
-| `comment` | `verified-live` | Live release report | Real comment/delete-comment rollback succeeded. |
-| `reply` | `tested-local` | Local tests + rate-limit handling fix | Retained in source only; not exposed in the default CLI surface for this release. |
-| `delete-comment` | `verified-live` | Live release report | Real comment delete rollback succeeded. |
+- 已真实跑通：
+  - `xhs board 'https://www.xiaohongshu.com/board/69e3597300000000160244ac?source=web_user_page' --json`
+- 关键观察：
+  - `board/user` API 本身仍失败
+  - 但 HTML fallback 能解析真实 board 页面，拿到 `note_id` 和 `xsec_token`
 
 ### Creator
 
-| Command | Status | Evidence | Notes |
-| --- | --- | --- | --- |
-| `my-notes` | `verified-live` | Live release report | Real API success in the full release pass. |
-| `post` | `untested-high-risk` | Creator tests exist | Retained in source only; not exposed in the default CLI surface for this release. |
-| `delete` | `untested-high-risk` | Creator tests exist | Retained in source only; not exposed in the default CLI surface for this release. |
+- 已真实跑通：
+  - `xhs my-notes --json`
+  - `xhs post --title ... --body ... --images ... --private --json`
+- 关键观察：
+  - `post` 已成功创建私密测试笔记，并返回真实 `note_id`
+  - `post` 目前仍不宜单独视为完整闭环能力，因为 `delete` 未打通
 
-### Notifications
+## 真实失败复现证据
 
-| Command | Status | Evidence | Notes |
-| --- | --- | --- | --- |
-| `notifications` | `known-broken` | Live release report + clearer fallback | Current public web API returned `code -1`; removed from the default CLI surface. |
-| `unread` | `verified-live` | Live release report | Real API success in the full release pass. |
+### 用户页相关
 
-## Release Recommendation
+- 已真实复现失败：
+  - `user`
+  - `user-posts`
+- 典型现象：
+  - `code -1`
+  - `HTTP 406`
 
-### Safe To Ship First
+### 收藏 / 点赞列表
 
-- `login`
-- `login --qrcode-http`
-- `status`
-- `whoami`
-- `auth doctor`
-- `auth inspect`
-- `auth import --file`
-- `search`
-- `search-user`
-- `topics`
-- `feed`
-- `hot`
-- `read`
-- `comments`
-- `my-notes`
-- `unread`
-- `like`
-- `favorite`
-- `unfavorite`
-- `comment`
-- `delete-comment`
-- `follow`
-- `unfollow`
+- 已真实复现失败：
+  - `favorites`
+  - `likes`
+  - `board/user` API
+- 典型现象：
+  - `code -1`
+- 备注：
+  - `board` 命令当前依赖 HTML fallback，而不是 `board/user` API
 
-### Must Be Marked Unsupported Or Hidden Before Release
+### 通知列表
 
-- `user`
-- `user-posts`
-- `favorites`
-- `likes`
-- `notifications`
+- 已真实复现失败：
+  - `notifications`
+  - `you/mentions`
+  - `you/likes`
+  - `you/connections`
+- 关键观察：
+  - `unread` 仍可单独成功
 
-### Must Be Validated Before Release If Kept
+### 子评论
 
-- `sub-comments`
-- `reply`
-- `post`
-- `delete`
-- browser cookie extraction path of `login --browser`
-- browser-assisted `login --qrcode`
+- 已真实复现失败：
+  - `sub-comments`
+- 已尝试但仍失败的变量：
+  - 不同 `xsec_token`
+  - 不同 `xsec_source`
+  - 不同 `top_comment_id`
+  - 不同 `image_formats`
+- 典型现象：
+  - `code -1`
 
-## Suggested Final Release Pass
+### Creator 删除
 
-1. Re-run `uv run pytest -m smoke tests/test_smoke.py -q`
-2. Manually verify `login`
-3. Run `uv run python scripts/live_release_validation.py > live_release_report.yaml`
-4. Confirm removed commands stay out of the default CLI surface
-5. Run creator write tests only when delete rollback is verified for the current session type:
-   `uv run python scripts/live_release_validation.py --enable-creator-write-tests`
-6. Run browser cookie extraction check only as a separate optional pass:
-   `uv run python scripts/live_release_validation.py --enable-browser-login-check`
-7. Freeze the final supported command list in README / release notes
+- 已真实复现失败：
+  - `xhs delete 69e35d53000000001a029d52 --yes --json`
+- 关键观察：
+  - `auth doctor` 显示 `main` 与 `creator` 都是 `valid`
+  - `get_creator_note_list(page=0)` 可正常读取，并确认测试私密笔记仍存在
+  - 当前 `/api/galaxy/creator/note/delete` 及其若干候选变体都未成功
+  - 新实现已把这类失败收敛为明确的 `unsupported_operation`
 
-## Updated Strategy
+## 关键收敛结论
 
-- Default release validation now aims for **one manual login only**.
-- The main pass reuses the same authenticated session for read-only coverage and rollback-safe write checks.
-- Creator `post/delete` is now treated as a separately gated pass, because a failed `delete` may leave orphaned test content.
-- Browser-cookie `login` is also separated from the main pass so it does not overwrite a known-good QR session mid-run.
+- `reply` 与 `sub-comments` 不能再视作同一风险组：
+  - `reply` 已真实成功
+  - `sub-comments` 真实失败
+- `favorites` 与 `board` 也不能再视作同一路径：
+  - `favorites` 列表 API 失败
+  - `board` 通过 HTML fallback 真实可用
+- `post` 与 `delete` 当前不能对外承诺为完整 creator 闭环：
+  - `post` 成功
+  - `delete` 失败
+
+## 后续验证建议
+
+- 若继续攻 `delete`：
+  - 需要从创作者后台重新抓取真实删除请求
+- 若继续攻 `sub-comments`：
+  - 需要从真实评论页重新抓取当前二级评论请求
+- 若继续攻 `user / notifications`：
+  - 需要对照真实浏览器请求补充上下文，而不是继续只猜 endpoint

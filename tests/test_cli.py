@@ -101,9 +101,9 @@ class TestCliBasic:
             "search", "read", "comments", "feed", "hot", "topics", "search-user", "my-notes",
             "unread",
             # Interactions
-            "like", "favorite", "unfavorite", "comment", "delete-comment",
+            "like", "favorite", "unfavorite", "comment", "reply", "delete-comment",
             # Social
-            "follow", "unfollow",
+            "follow", "unfollow", "board",
         ]
         for cmd in commands_expected:
             assert cmd in commands_in_help, f"Command '{cmd}' not found in CLI help"
@@ -115,7 +115,6 @@ class TestCliBasic:
             "favorites",
             "likes",
             "notifications",
-            "reply",
             "post",
             "delete",
         ]
@@ -124,6 +123,51 @@ class TestCliBasic:
 
     def test_whoami_help(self):
         result = runner.invoke(cli, ["whoami", "--help"])
+        assert result.exit_code == 0
+
+    def test_reply_help(self):
+        result = runner.invoke(cli, ["reply", "--help"])
+        assert result.exit_code == 0
+
+    def test_board_command_accepts_url(self, monkeypatch):
+        captured = {}
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_board_from_html(self, board_id):
+                captured["board_id"] = board_id
+                return {
+                    "board_id": board_id,
+                    "name": "Board Title",
+                    "desc": "",
+                    "note_count": 1,
+                    "notes": [{"note_id": "note-1", "title": "Hello", "xsec_token": "tok"}],
+                }
+
+        monkeypatch.setattr("xhs_cli.commands._common.load_saved_cookies", lambda: {"a1": "cookie"})
+        monkeypatch.setattr("xhs_cli.commands._common.XhsClient", FakeClient)
+
+        result = runner.invoke(
+            cli,
+            ["board", "https://www.xiaohongshu.com/board/board-123?source=web_user_page", "--json"],
+        )
+
+        assert result.exit_code == 0
+        assert captured["board_id"] == "board-123"
+        payload = json.loads(result.output)
+        assert payload["ok"] is True
+        assert payload["data"]["board_id"] == "board-123"
+
+    def test_board_help(self):
+        result = runner.invoke(cli, ["board", "--help"])
         assert result.exit_code == 0
 
     def test_auth_doctor_reports_missing_cookie_file(self, monkeypatch, tmp_path):
@@ -175,6 +219,52 @@ class TestCliBasic:
         assert payload["data"]["login_status"] == "valid"
         assert payload["data"]["authenticated"] is True
         assert payload["data"]["user"]["username"] == "alice001"
+        assert payload["data"]["domains"]["main"]["login_status"] == "valid"
+        assert payload["data"]["domains"]["creator"]["login_status"] == "unknown"
+
+    def test_auth_doctor_separates_main_and_creator_domain_status(self, monkeypatch, tmp_path):
+        monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "cookies.json")
+        monkeypatch.setattr(
+            "xhs_cli.commands.auth.load_saved_cookies",
+            lambda: {"a1": "a1", "web_session": "sess", "webId": "webid"},
+        )
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {
+                    "guest": False,
+                    "basic_info": {
+                        "user_id": "u-1",
+                        "nickname": "Alice",
+                        "red_id": "alice001",
+                    },
+                }
+
+            def get_creator_note_list(self, page=0):
+                raise SessionExpiredError()
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(cli, ["auth", "doctor", "--yaml"])
+
+        assert result.exit_code == 0
+        payload = yaml.safe_load(result.output)
+        assert payload["data"]["login_status"] == "valid"
+        assert payload["data"]["authenticated"] is True
+        assert payload["data"]["domains"]["main"]["login_status"] == "valid"
+        assert payload["data"]["domains"]["creator"]["login_status"] == "invalid"
+        assert payload["data"]["domains"]["creator"]["authenticated"] is False
+        assert "Session expired" in payload["data"]["domains"]["creator"]["validation_error"]["message"]
+        assert payload["data"]["recommended_action"] == "none"
 
     def test_auth_import_file_supports_browser_cookie_list(self, monkeypatch, tmp_path):
         source_file = tmp_path / "cookies.json"
@@ -288,6 +378,63 @@ class TestCliBasic:
         assert payload["ok"] is False
         assert payload["error"]["code"] == "api_error"
         assert "Missing required cookie fields" in payload["error"]["message"]
+
+    def test_auth_import_fields_interactive_shows_all_fields_in_plain_text(self, monkeypatch, tmp_path):
+        saved = []
+        prompts = []
+        monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "saved-cookies.json")
+        monkeypatch.setattr("xhs_cli.commands.auth.save_cookies", lambda cookies: saved.append(cookies))
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {
+                    "guest": False,
+                    "basic_info": {
+                        "user_id": "u-1",
+                        "nickname": "Alice",
+                        "red_id": "alice001",
+                    },
+                }
+
+        values = {
+            "a1": "a1-token",
+            "web_session": "session-token",
+            "webId": "webid-token",
+            "web_session_sec (optional)": "",
+            "gid (optional)": "",
+            "websectiga (optional)": "",
+            "sec_poison_id (optional)": "",
+            "xsecappid (optional)": "",
+            "id_token (optional)": "",
+        }
+
+        def fake_prompt(text, **kwargs):
+            prompts.append((text, kwargs))
+            return values[text]
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+        monkeypatch.setattr("xhs_cli.commands.auth.click.prompt", fake_prompt)
+
+        result = runner.invoke(cli, ["auth", "import-fields", "--interactive", "--yaml"])
+
+        assert result.exit_code == 0
+        assert saved == [{
+            "a1": "a1-token",
+            "web_session": "session-token",
+            "webId": "webid-token",
+        }]
+        prompt_map = {text: kwargs for text, kwargs in prompts}
+        for field in values:
+            assert prompt_map[field].get("hide_input") is not True
 
     def test_auth_inspect_masks_cookie_values(self, monkeypatch, tmp_path):
         monkeypatch.setattr("xhs_cli.commands.auth.get_cookie_path", lambda: tmp_path / "cookies.json")

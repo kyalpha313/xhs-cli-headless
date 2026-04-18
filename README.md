@@ -8,6 +8,9 @@
 
 > 说明：这是基于上游项目维护的发布分支，重点强化了 headless 二维码登录、登录态诊断、结构化输出和发布前验证流程。README 已按本 fork 的真实支持范围重写，不再沿用上游的推广内容与发布口径。
 
+当前支持、隐藏和已知失败能力的总览，见 [capability-status.md](file:///Users/bytedance/Documents/Trae/xhs-cli-headless/docs/capability-status.md)。
+本次 `0.8.5` 版本默认开放了 `xhs board` 和 `xhs reply`。
+
 ## 中文说明
 
 ### 项目定位
@@ -20,50 +23,14 @@
 - 本 fork 的 README、测试矩阵和发布说明，只描述当前 fork 已验证的行为，不默认继承上游全部能力承诺。
 - 原项目需要浏览器实现登陆动作，不适合服务器部署与Agent交互，本项目完善了命令行模式下的登陆功能，包括纯 HTTP 二维码登录，登录态导入 / 诊断 / 检查等。
 
-### 首版稳定范围
+### 当前能力口径
 
-以下能力已收敛为本 fork 当前首版稳定范围：
+README 这里只保留摘要，完整状态请以 [capability-status.md](file:///Users/bytedance/Documents/Trae/xhs-cli-headless/docs/capability-status.md) 为准。
 
-- `xhs login` 默认 headless 二维码登录（即--qrcode-http，含终端二维码 + 登录链接）
-- `xhs status` 检查登录态
-- `xhs whoami` 获取当前用户 ID
-- `xhs auth doctor` 诊断当前登录态是否完整、是否可用
-- `xhs auth inspect` 检查本地已保存 cookies 的字段情况（不输出敏感值）
-- `xhs auth import --file` 导入 cookies
-- `xhs search` 搜索笔记
-- `xhs search-user` 搜索用户
-- `xhs topics` 获取话题
-- `xhs feed` 获取动态
-- `xhs hot` 获取热门笔记
-- `xhs read` 读取笔记
-- `xhs comments` 获取评论
-- `xhs my-notes` 获取自己的笔记
-- `xhs unread` 获取未读笔记
-- `xhs like` / `xhs like --undo` 点赞/取消点赞笔记
-- `xhs favorite` / `xhs unfavorite` 收藏/取消收藏笔记
-- `xhs comment` / `xhs delete-comment` 评论/删除评论
-- `xhs follow` / `xhs unfollow` 关注/取消关注用户
-
-### 当前未纳入发布命令面
-
-以下能力当前不纳入本 release 的默认命令面：
-
-- `xhs login --browser` 浏览器方式登录
-- `xhs login --qrcode` 浏览器辅助二维码登录
-- `xhs sub-comments` 获取子评论
-- `xhs reply` 回复评论
-- `xhs post` 发布笔记
-- `xhs delete` 删除笔记
-- `xhs user` 获取用户信息
-- `xhs user-posts` 获取用户笔记
-- `xhs favorites` 获取收藏笔记
-- `xhs likes` 获取点赞笔记
-- `xhs notifications` 获取通知
-
-说明：
-
-- 上述能力中，一部分是兼容/实验路径，另一部分已确认在当前 public web API 下不可稳定使用
-- 它们当前不在 `xhs --help` 的默认命令列表中，也不应作为 Agent 的默认调用入口
+- 默认支持能力：认证、搜索、阅读、评论、回复、删评论、关注、单笔记收藏，以及基于 HTML fallback 的 `xhs board`
+- 默认隐藏能力：`xhs post`、`xhs login --browser`、`xhs login --qrcode`
+- 已知失败能力：`xhs delete`、`xhs sub-comments`、`xhs user`、`xhs user-posts`、`xhs favorites`、`xhs likes`、`xhs notifications`
+- 当前关键结论：`xhs post` 已真实成功，`xhs delete` 当前仍失败；`xhs board` 已真实可用并作为收藏专辑替代路线公开
 
 ### 安装
 
@@ -111,6 +78,10 @@ xhs auth inspect --yaml
 xhs search "小红书" --yaml
 xhs read <note_id_or_url> --yaml
 xhs comments <note_id_or_url> --yaml
+
+# 4) 新增默认能力
+xhs board <board_id_or_url> --yaml
+xhs reply <note_id_or_url> --comment-id <comment_id> -c "收到"
 ```
 
 ### 认证方式
@@ -142,6 +113,9 @@ xhs auth import --file cookies.json
 
 ### 常用命令
 
+默认 `xhs --help` 里出现的命令，都是当前版本优先支持的入口。
+隐藏命令和已知失败能力，请优先查看 [capability-status.md](file:///Users/bytedance/Documents/Trae/xhs-cli-headless/docs/capability-status.md)。
+
 ```bash
 # Auth
 xhs login
@@ -168,7 +142,9 @@ xhs like <note_id_or_url>
 xhs like <note_id_or_url> --undo
 xhs favorite <note_id_or_url>
 xhs unfavorite <note_id_or_url>
+xhs board <board_id_or_url>
 xhs comment <note_id_or_url> -c "好赞"
+xhs reply <note_id_or_url> --comment-id <comment_id> -c "收到"
 xhs delete-comment <note_id> <comment_id>
 xhs follow <user_id>
 xhs unfollow <user_id>

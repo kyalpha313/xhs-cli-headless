@@ -11,7 +11,9 @@ Usage:
     xhs like <id_or_url> [--undo]
     xhs favorite <id_or_url>
     xhs unfavorite <id_or_url>
+    xhs board <board_id_or_url>
     xhs comment <id_or_url> --content "..."
+    xhs reply <id_or_url> --comment-id <comment_id> --content "..."
     xhs my-notes [--page N]
     xhs unread
 """
@@ -86,16 +88,20 @@ cli.add_command(interactions.like)
 cli.add_command(interactions.favorite)
 cli.add_command(interactions.unfavorite)
 cli.add_command(interactions.comment)
+cli.add_command(interactions.reply)
 cli.add_command(interactions.delete_comment)
 
 # ─── Social commands ────────────────────────────────────────────────────────
 
 cli.add_command(social.follow)
 cli.add_command(social.unfollow)
+cli.add_command(social.board)
 
 # ─── Creator commands ───────────────────────────────────────────────────────
 
 cli.add_command(creator.my_notes)
+cli.add_command(creator.post)
+cli.add_command(creator.delete)
 
 # ─── Notification commands ──────────────────────────────────────────────────
 

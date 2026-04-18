@@ -8,6 +8,7 @@ import pytest
 from xhs_cli.client import XhsClient
 from xhs_cli.cookies import cache_note_context, get_cached_note_context
 from xhs_cli.exceptions import UnsupportedOperationError, XhsApiError
+from xhs_cli.html_parser import extract_board_from_html
 
 
 class TestFavorites:
@@ -53,7 +54,7 @@ class TestCreatorEndpoints:
         assert captured["params"] == {"tab": 0, "page": 2}
 
     def test_delete_note_raises_unsupported_for_404(self, monkeypatch):
-        def fake_post(self, uri, data):
+        def fake_post(self, uri, data, header_overrides=None, method="POST"):
             raise XhsApiError(
                 "API error: {\"status\": 404}",
                 response={"status": 404},
@@ -64,6 +65,66 @@ class TestCreatorEndpoints:
         client = XhsClient({"a1": "cookie"})
         try:
             with pytest.raises(UnsupportedOperationError, match="Delete note is currently unavailable"):
+                client.delete_note("note-123")
+        finally:
+            client.close()
+
+    def test_delete_note_tries_multiple_candidates_before_success(self, monkeypatch):
+        calls = []
+
+        def fake_post(self, uri, data, header_overrides=None, method="POST"):
+            calls.append((uri, data, header_overrides, method))
+            if len(calls) < 3:
+                raise XhsApiError(
+                    "API error: {\"code\": -1, \"result\": -100, \"msg\": \"登录已过期\"}",
+                    code=-1,
+                    response={"code": -1, "result": -100, "msg": "登录已过期"},
+                )
+            return {"ok": True}
+
+        monkeypatch.setattr(XhsClient, "_creator_post", fake_post)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            result = client.delete_note("note-123")
+        finally:
+            client.close()
+
+        assert result == {"ok": True}
+        assert calls[:3] == [
+            (
+                "/api/galaxy/creator/note/delete",
+                {"note_id": "note-123"},
+                {"referer": "https://creator.xiaohongshu.com/publish/notes"},
+                "POST",
+            ),
+            (
+                "/api/galaxy/creator/note/delete",
+                {"noteId": "note-123"},
+                {"referer": "https://creator.xiaohongshu.com/publish/notes"},
+                "POST",
+            ),
+            (
+                "/api/galaxy/creator/note/delete",
+                {"id": "note-123"},
+                {"referer": "https://creator.xiaohongshu.com/publish/notes"},
+                "POST",
+            ),
+        ]
+
+    def test_delete_note_maps_repeated_login_expired_to_unsupported(self, monkeypatch):
+        def fake_post(self, uri, data, header_overrides=None, method="POST"):
+            raise XhsApiError(
+                "API error: {\"code\": -1, \"result\": -100, \"msg\": \"\\u767b\\u5f55\\u5df2\\u8fc7\\u671f\"}",
+                code=-1,
+                response={"code": -1, "result": -100, "msg": "登录已过期"},
+            )
+
+        monkeypatch.setattr(XhsClient, "_creator_post", fake_post)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            with pytest.raises(UnsupportedOperationError, match="creator-side login expired"):
                 client.delete_note("note-123")
         finally:
             client.close()
@@ -102,8 +163,96 @@ class TestTransportCookies:
 
 
 class TestReadingEndpointBehavior:
+    def test_extract_board_from_ssr_html(self):
+        html = """
+<script>
+window.__INITIAL_SSR_STATE__ = {"Main":{"albumInfo":{"name":"Board A","desc":"desc","noteCount":2},"notesDetail":[{"id":"n1","xsecToken":"t1","title":"One","type":"normal","user":{"nickname":"Alice"},"cover":{"url":"https://img/1.jpg?x-oss=1"}},{"id":"n2","xsecToken":"t2","displayTitle":"Two","type":"video","user":{"nickName":"Bob"},"cover":{"url":"https://img/2.jpg"}}]}};
+</script>
+"""
+        data = extract_board_from_html(html, "board-1")
+        assert data["board_id"] == "board-1"
+        assert data["name"] == "Board A"
+        assert data["desc"] == "desc"
+        assert data["note_count"] == 2
+        assert data["notes"][0]["note_id"] == "n1"
+        assert data["notes"][0]["xsec_token"] == "t1"
+        assert data["notes"][0]["author"] == "Alice"
+        assert data["notes"][0]["cover"] == "https://img/1.jpg"
+
+    def test_extract_board_from_legacy_html(self):
+        html = """
+<script>
+window.__INITIAL_STATE__={"board":{"boardDetails":{"board-2":{"name":"Legacy Board","desc":"old","noteCount":1}},"boardFeedsMap":{"board-2":{"notes":[{"noteId":"n9","xsec_token":"tok-9","displayTitle":"Legacy note","type":"normal","user":{"nickname":"Carol"},"cover":{"url":"https://img/9.jpg?foo=1"}}]}}}}</script>
+"""
+        data = extract_board_from_html(html, "board-2")
+        assert data["board_id"] == "board-2"
+        assert data["name"] == "Legacy Board"
+        assert data["desc"] == "old"
+        assert data["note_count"] == 1
+        assert data["notes"][0]["note_id"] == "n9"
+        assert data["notes"][0]["xsec_token"] == "tok-9"
+        assert data["notes"][0]["author"] == "Carol"
+        assert data["notes"][0]["cover"] == "https://img/9.jpg"
+
+    def test_get_board_from_html_uses_board_page_fetch(self, monkeypatch):
+        html = """
+<script>
+window.__INITIAL_SSR_STATE__ = {"Main":{"albumInfo":{"title":"Board Title"},"notesDetail":[]}};
+</script>
+"""
+
+        def fake_fetch(self, board_id):
+            assert board_id == "board-123"
+            return html
+
+        monkeypatch.setattr(XhsClient, "_fetch_board_html", fake_fetch)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            data = client.get_board_from_html("board-123")
+        finally:
+            client.close()
+
+        assert data["board_id"] == "board-123"
+        assert data["name"] == "Board Title"
+
+    def test_get_user_info_retries_with_windows_profile_after_code_minus_one(self, monkeypatch):
+        calls = []
+
+        def fake_get(self, uri, params=None, sign_profile="default"):
+            calls.append((uri, params, sign_profile))
+            if sign_profile == "default":
+                raise XhsApiError(
+                    "API error: {\"code\": -1, \"success\": false}",
+                    code=-1,
+                    response={"code": -1, "success": False},
+                )
+            return {"user_id": "user-123"}
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            result = client.get_user_info("user-123")
+        finally:
+            client.close()
+
+        assert result == {"user_id": "user-123"}
+        assert calls == [
+            (
+                "/api/sns/web/v1/user/otherinfo",
+                {"target_user_id": "user-123"},
+                "default",
+            ),
+            (
+                "/api/sns/web/v1/user/otherinfo",
+                {"target_user_id": "user-123"},
+                "windows",
+            ),
+        ]
+
     def test_get_user_info_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
-        def fake_get(self, uri, params=None):
+        def fake_get(self, uri, params=None, sign_profile="default"):
             raise XhsApiError(
                 "API error: {\"code\": -1, \"success\": false}",
                 code=-1,
@@ -119,8 +268,53 @@ class TestReadingEndpointBehavior:
         finally:
             client.close()
 
+    def test_get_user_notes_retries_with_windows_profile_after_code_minus_one(self, monkeypatch):
+        calls = []
+
+        def fake_get(self, uri, params=None, sign_profile="default"):
+            calls.append((uri, params, sign_profile))
+            if sign_profile == "default":
+                raise XhsApiError(
+                    "API error: {\"code\": -1, \"success\": false}",
+                    code=-1,
+                    response={"code": -1, "success": False},
+                )
+            return {"notes": []}
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            result = client.get_user_notes("user-123")
+        finally:
+            client.close()
+
+        assert result == {"notes": []}
+        assert calls == [
+            (
+                "/api/sns/web/v1/user_posted",
+                {
+                    "num": 30,
+                    "cursor": "",
+                    "user_id": "user-123",
+                    "image_scenes": "FD_WM_WEBP",
+                },
+                "default",
+            ),
+            (
+                "/api/sns/web/v1/user_posted",
+                {
+                    "num": 30,
+                    "cursor": "",
+                    "user_id": "user-123",
+                    "image_scenes": "FD_WM_WEBP",
+                },
+                "windows",
+            ),
+        ]
+
     def test_get_user_notes_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
-        def fake_get(self, uri, params=None):
+        def fake_get(self, uri, params=None, sign_profile="default"):
             raise XhsApiError(
                 "API error: {\"code\": -1, \"success\": false}",
                 code=-1,
@@ -135,6 +329,31 @@ class TestReadingEndpointBehavior:
                 client.get_user_notes("user-123")
         finally:
             client.close()
+
+    def test_get_user_favorites_retries_with_windows_profile_after_code_minus_one(self, monkeypatch):
+        calls = []
+
+        def fake_get(self, uri, params=None, sign_profile="default"):
+            calls.append((uri, params, sign_profile))
+            if sign_profile == "default":
+                raise XhsApiError(
+                    "API error: {\"code\": -1, \"success\": false}",
+                    code=-1,
+                    response={"code": -1, "success": False},
+                )
+            return {"notes": []}
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+
+        client = XhsClient({"a1": "cookie"})
+        try:
+            result = client.get_user_favorites("user-123")
+        finally:
+            client.close()
+
+        assert result == {"notes": []}
+        assert calls[-1][2] == "windows"
+        assert calls[0][0] == "/api/sns/web/v2/note/collect/page"
 
     def test_get_sub_comments_uses_resolved_xsec_context(self, monkeypatch):
         captured = {}
@@ -205,7 +424,7 @@ class TestReadingEndpointBehavior:
             client.close()
 
     def test_notification_mentions_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
-        def fake_get(self, uri, params=None):
+        def fake_get(self, uri, params=None, sign_profile="default"):
             raise XhsApiError(
                 "API error: {\"code\": -1, \"success\": false}",
                 code=-1,
@@ -220,8 +439,32 @@ class TestReadingEndpointBehavior:
         finally:
             client.close()
 
+    def test_notification_mentions_retries_with_windows_profile_after_code_minus_one(self, monkeypatch):
+        calls = []
+
+        def fake_get(self, uri, params=None, sign_profile="default"):
+            calls.append((uri, params, sign_profile))
+            if sign_profile == "default":
+                raise XhsApiError(
+                    "API error: {\"code\": -1, \"success\": false}",
+                    code=-1,
+                    response={"code": -1, "success": False},
+                )
+            return {"messages": []}
+
+        monkeypatch.setattr(XhsClient, "_main_api_get", fake_get)
+        client = XhsClient({"a1": "cookie"})
+        try:
+            result = client.get_notification_mentions()
+        finally:
+            client.close()
+
+        assert result == {"messages": []}
+        assert calls[-1][2] == "windows"
+        assert calls[0][0] == "/api/sns/web/v1/you/mentions"
+
     def test_notification_likes_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
-        def fake_get(self, uri, params=None):
+        def fake_get(self, uri, params=None, sign_profile="default"):
             raise XhsApiError(
                 "API error: {\"code\": -1, \"success\": false}",
                 code=-1,
@@ -237,7 +480,7 @@ class TestReadingEndpointBehavior:
             client.close()
 
     def test_notification_connections_maps_code_minus_one_to_unsupported_operation(self, monkeypatch):
-        def fake_get(self, uri, params=None):
+        def fake_get(self, uri, params=None, sign_profile="default"):
             raise XhsApiError(
                 "API error: {\"code\": -1, \"success\": false}",
                 code=-1,

@@ -25,7 +25,7 @@ def extract_hashtags(body: str) -> list[str]:
     return re.findall(r"(?:^|(?<=\s))#([^\s#]+)", body)
 
 
-@click.command()
+@click.command(hidden=True)
 @click.option("--title", required=True, help="Note title")
 @click.option("--body", required=True, help="Note body text")
 @click.option("--images", required=True, multiple=True, help="Image file path(s)")
@@ -105,7 +105,7 @@ def my_notes(ctx, page: int, as_json: bool, as_yaml: bool):
     )
 
 
-@click.command("delete")
+@click.command("delete", hidden=True)
 @click.argument("id_or_url")
 @structured_output_options
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation")

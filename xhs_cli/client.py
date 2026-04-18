@@ -22,7 +22,15 @@ from .client_mixins import (
     ReadingEndpointsMixin,
     SocialEndpointsMixin,
 )
-from .constants import CHROME_VERSION, CREATOR_HOST, EDITH_HOST, HOME_URL, USER_AGENT
+from .constants import (
+    CHROME_VERSION,
+    CREATOR_HOST,
+    EDITH_HOST,
+    HOME_URL,
+    USER_AGENT,
+    WINDOWS_SEC_CH_UA,
+    WINDOWS_USER_AGENT,
+)
 from .cookies import cookies_to_string
 from .creator_signing import sign_creator
 from .exceptions import (
@@ -89,16 +97,27 @@ class XhsClient(
         self._last_request_time = time.time()
         self._request_count += 1
 
-    def _base_headers(self) -> dict[str, str]:
+    def _base_headers(self, sign_profile: str = "default") -> dict[str, str]:
+        if sign_profile == "windows":
+            user_agent = WINDOWS_USER_AGENT
+            sec_ch_ua = WINDOWS_SEC_CH_UA
+            sec_ch_ua_platform = '"Windows"'
+        else:
+            user_agent = USER_AGENT
+            sec_ch_ua = (
+                f'"Not:A-Brand";v="99", "Google Chrome";v="{CHROME_VERSION}", '
+                f'"Chromium";v="{CHROME_VERSION}"'
+            )
+            sec_ch_ua_platform = '"macOS"'
         return {
-            "user-agent": USER_AGENT,
+            "user-agent": user_agent,
             "content-type": "application/json;charset=UTF-8",
             "cookie": cookies_to_string(self.cookies),
             "origin": HOME_URL,
             "referer": f"{HOME_URL}/",
-            "sec-ch-ua": f'"Not:A-Brand";v="99", "Google Chrome";v="{CHROME_VERSION}", "Chromium";v="{CHROME_VERSION}"',
+            "sec-ch-ua": sec_ch_ua,
             "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"macOS"',
+            "sec-ch-ua-platform": sec_ch_ua_platform,
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-site",
@@ -193,12 +212,17 @@ class XhsClient(
         self,
         uri: str,
         params: dict[str, str | int | list[str]] | None = None,
+        sign_profile: str = "default",
     ) -> Any:
-        sign_headers = sign_main_api("GET", uri, self.cookies, params=params)
+        sign_headers = sign_main_api("GET", uri, self.cookies, params=params, profile=sign_profile)
         full_uri = build_get_uri(uri, params)
         url = f"{EDITH_HOST}{full_uri}"
         logger.debug("GET %s", url)
-        resp = self._request_with_retry("GET", url, headers={**self._base_headers(), **sign_headers})
+        resp = self._request_with_retry(
+            "GET",
+            url,
+            headers={**self._base_headers(sign_profile=sign_profile), **sign_headers},
+        )
         return self._handle_response(resp)
 
     def _main_api_post(
@@ -206,10 +230,11 @@ class XhsClient(
         uri: str,
         data: dict[str, Any],
         header_overrides: dict[str, str] | None = None,
+        sign_profile: str = "default",
     ) -> Any:
-        sign_headers = sign_main_api("POST", uri, self.cookies, payload=data)
+        sign_headers = sign_main_api("POST", uri, self.cookies, payload=data, profile=sign_profile)
         url = f"{EDITH_HOST}{uri}"
-        headers = {**self._base_headers(), **sign_headers}
+        headers = {**self._base_headers(sign_profile=sign_profile), **sign_headers}
         if header_overrides:
             headers.update(header_overrides)
         logger.debug("POST %s", url)
@@ -240,7 +265,13 @@ class XhsClient(
         resp = self._request_with_retry("GET", url, headers=headers)
         return self._handle_response(resp)
 
-    def _creator_post(self, uri: str, data: dict[str, Any]) -> Any:
+    def _creator_post(
+        self,
+        uri: str,
+        data: dict[str, Any],
+        header_overrides: dict[str, str] | None = None,
+        method: str = "POST",
+    ) -> Any:
         sign = sign_creator(f"url={uri}", data, self.cookies["a1"])
         host = self._creator_host(uri)
         url = f"{host}{uri}"
@@ -251,7 +282,9 @@ class XhsClient(
             "origin": CREATOR_HOST,
             "referer": f"{CREATOR_HOST}/",
         }
+        if header_overrides:
+            headers.update(header_overrides)
         logger.debug("Creator POST %s", url)
         body = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
-        resp = self._request_with_retry("POST", url, headers=headers, content=body)
+        resp = self._request_with_retry(method, url, headers=headers, content=body)
         return self._handle_response(resp)

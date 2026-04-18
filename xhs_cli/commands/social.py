@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlparse
 
 import click
 
@@ -20,6 +21,16 @@ def _resolve_user_id(ctx, user_id: str | None) -> str:
     if not uid:
         raise click.UsageError("Cannot determine current user_id. Please specify user_id explicitly.")
     return uid
+
+
+def _resolve_board_id(board_id_or_url: str) -> str:
+    if "xiaohongshu.com" not in board_id_or_url:
+        return board_id_or_url.strip()
+    parsed = urlparse(board_id_or_url)
+    parts = [part for part in parsed.path.rstrip("/").split("/") if part]
+    if len(parts) >= 2 and parts[-2] == "board":
+        return parts[-1]
+    return board_id_or_url.strip()
 
 
 def _paged_notes_command(
@@ -105,3 +116,28 @@ def likes(ctx, user_id: str | None, cursor: str, as_json: bool, as_yaml: bool):
         user_id=user_id, cursor=cursor, as_json=as_json, as_yaml=as_yaml,
     )
 
+
+@click.command()
+@click.argument("board_id_or_url")
+@structured_output_options
+@click.pass_context
+def board(ctx, board_id_or_url: str, as_json: bool, as_yaml: bool):
+    """Read a board/collection album via the HTML fallback."""
+    board_id = _resolve_board_id(board_id_or_url)
+
+    def _action(client):
+        data = client.get_board_from_html(board_id)
+        save_index_from_notes(data.get("notes", []))
+        return data
+
+    def _render(data):
+        click.echo(f"Board: {data.get('name') or board_id}")
+        if data.get("desc"):
+            print_info(data["desc"])
+        notes = data.get("notes", [])
+        render_user_posts(notes)
+        note_count = data.get("note_count")
+        if note_count is not None:
+            print_info(f"Board note count: {note_count}")
+
+    handle_command(ctx, action=_action, render=_render, as_json=as_json, as_yaml=as_yaml)
