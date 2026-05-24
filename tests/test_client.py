@@ -7,8 +7,9 @@ import pytest
 
 from xhs_cli.client import XhsClient
 from xhs_cli.cookies import cache_note_context, get_cached_note_context
-from xhs_cli.exceptions import UnsupportedOperationError, XhsApiError
-from xhs_cli.html_parser import extract_board_from_html
+from xhs_cli.exceptions import SessionExpiredError, UnsupportedOperationError, XhsApiError
+from xhs_cli.formatter import parse_note_reference
+from xhs_cli.html_parser import extract_board_from_html, extract_note_from_html
 
 
 class TestFavorites:
@@ -161,8 +162,73 @@ class TestTransportCookies:
         assert client.cookies["web_session"] == "real-session"
         assert client.cookies["web_session_sec"] == "real-sec"
 
+    def test_code_minus_101_maps_to_session_expired_with_recovery(self):
+        request = httpx.Request("GET", "https://edith.xiaohongshu.com/api/test")
+        response = httpx.Response(
+            200,
+            json={"success": False, "code": -101, "msg": "无登录信息，或登录信息为空", "data": {}},
+            request=request,
+        )
+        client = XhsClient({"a1": "cookie"})
+        try:
+            with pytest.raises(SessionExpiredError) as raised:
+                client._handle_response(response)
+        finally:
+            client.close()
+
+        assert raised.value.code == -101
+        assert raised.value.recovery["steps"][0]["command"] == "xhs auth doctor --json"
+
 
 class TestReadingEndpointBehavior:
+    def test_parse_profile_note_url(self):
+        note_id, token, source = parse_note_reference(
+            "https://www.xiaohongshu.com/user/profile/u123/note-456?xsec_token=tok&xsec_source=pc_user"
+        )
+
+        assert note_id == "note-456"
+        assert token == "tok"
+        assert source == "pc_user"
+
+    def test_parse_explore_note_url(self):
+        note_id, token, source = parse_note_reference(
+            "https://www.xiaohongshu.com/explore/note-789?xsec_token=tok2&xsec_source=pc_feed"
+        )
+
+        assert note_id == "note-789"
+        assert token == "tok2"
+        assert source == "pc_feed"
+
+    def test_extract_note_from_mobile_html_counts_only_note_images(self):
+        html = """
+<script>
+window.__INITIAL_STATE__={"noteData":{"data":{"noteData":{
+"noteId":"note-1",
+"title":"Title",
+"desc":"Body",
+"user":{"nickName":"Alice","userId":"u1","avatar":"https://avatar"},
+"interactInfo":{"likedCount":"10","collectedCount":"2","commentCount":"3","shareCount":"1"},
+"imageList":[
+{"fileId":"f1","width":100,"height":200,"url":"https://img/1.jpg"},
+{"fileId":"f2","width":100,"height":200,"infoList":[{"imageScene":"H5_DTL","url":"https://img/2.jpg"}]}
+],
+"tagList":[{"name":"tag-a"}]
+},"commentData":{"commentCount":3,"comments":[{"id":"c1","content":"hello"}]}}}}</script>
+<img src="https://avatar/not-note.jpg">
+<img src="https://related/not-note.jpg">
+"""
+        data = extract_note_from_html(html, "note-1")
+        note = data["items"][0]["note_card"]
+
+        assert note["note_id"] == "note-1"
+        assert note["title"] == "Title"
+        assert note["desc"] == "Body"
+        assert note["user"]["nickname"] == "Alice"
+        assert len(note["image_list"]) == 2
+        assert note["image_list"][1]["url"] == "https://img/2.jpg"
+        assert data["comment_page"]["commentCount"] == 3
+        assert data["comments"][0]["content"] == "hello"
+
     def test_extract_board_from_ssr_html(self):
         html = """
 <script>

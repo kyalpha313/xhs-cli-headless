@@ -1,12 +1,15 @@
 """Tests for CLI commands using Click's test runner."""
 
 import json
+from pathlib import Path
 
 import click
 import pytest
+import tomllib
 import yaml
 from click.testing import CliRunner
 
+from xhs_cli import __version__
 from xhs_cli.cli import cli
 from xhs_cli.exceptions import SessionExpiredError
 
@@ -52,6 +55,11 @@ class TestCliBasic:
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
         assert "0." in result.output  # dynamic version from importlib.metadata
+
+    def test_runtime_version_matches_pyproject(self):
+        pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+        version = tomllib.loads(pyproject.read_text())["project"]["version"]
+        assert __version__ == version
 
     def test_help(self):
         result = runner.invoke(cli, ["--help"])
@@ -703,6 +711,11 @@ class TestCliBasic:
         payload = yaml.safe_load(result.output)
         assert payload["ok"] is False
         assert payload["error"]["code"] == "not_authenticated"
+        assert payload["error"]["details"]["steps"][0]["command"] == "xhs auth doctor --json"
+        assert "xhs login" in [
+            step["command"]
+            for step in payload["error"]["details"]["steps"]
+        ]
 
     def test_status_reports_not_authenticated_when_session_expired(self, monkeypatch):
         monkeypatch.setenv("OUTPUT", "auto")
@@ -718,6 +731,9 @@ class TestCliBasic:
         payload = yaml.safe_load(result.output)
         assert payload["ok"] is False
         assert payload["error"]["code"] == "not_authenticated"
+        commands = [step["command"] for step in payload["error"]["details"]["steps"]]
+        assert "xhs auth doctor --json" in commands
+        assert "xhs auth import-fields --interactive" in commands
 
     def test_logout_supports_structured_output(self):
         from xhs_cli.commands import auth
@@ -887,6 +903,12 @@ class TestCliBasic:
 
         assert result.exit_code != 0
         assert "999" in result.output
+
+    def test_read_short_link_returns_explicit_usage_error(self):
+        result = runner.invoke(cli, ["read", "http://xhslink.com/o/abc"])
+
+        assert result.exit_code != 0
+        assert "xhslink.com short links" in result.output
 
     def test_search_empty_results_clear_previous_index(self, monkeypatch):
         from xhs_cli.note_refs import save_index_from_items

@@ -63,17 +63,26 @@ def get_config_dir() -> Path:
     if configured:
         candidates.append(Path(configured).expanduser())
     candidates.append(Path.home() / CONFIG_DIR_NAME)
-    fallback = Path(tempfile.gettempdir()) / CONFIG_DIR_NAME
-    if fallback not in candidates:
-        candidates.append(fallback)
+
+    temp_root = Path(tempfile.gettempdir())
+    fallbacks = [
+        temp_root / CONFIG_DIR_NAME,
+        Path("/private/tmp") / CONFIG_DIR_NAME,
+    ]
+    if str(temp_root).startswith("/var/"):
+        fallbacks.insert(1, Path("/private") / temp_root.relative_to("/"))
+
+    for fallback in fallbacks:
+        if fallback not in candidates:
+            candidates.append(fallback)
 
     for config_dir in candidates:
         if _is_writable_dir(config_dir):
-            if config_dir == fallback and not configured:
+            if config_dir in fallbacks and not configured:
                 logger.warning(
                     "Config dir %s is unavailable; using temporary fallback %s",
                     Path.home() / CONFIG_DIR_NAME,
-                    fallback,
+                    config_dir,
                 )
             return config_dir
 

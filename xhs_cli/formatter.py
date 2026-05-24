@@ -43,8 +43,13 @@ def parse_note_reference(id_or_url: str) -> tuple[str, str, str]:
         from urllib.parse import parse_qs, urlparse
 
         parsed = urlparse(id_or_url)
-        parts = parsed.path.rstrip("/").split("/")
-        note_id = parts[-1]
+        parts = [part for part in parsed.path.rstrip("/").split("/") if part]
+        if "explore" in parts:
+            note_id = parts[parts.index("explore") + 1]
+        elif len(parts) >= 3 and parts[0] == "user" and parts[1] == "profile":
+            note_id = parts[-1]
+        else:
+            note_id = parts[-1] if parts else id_or_url
         qs = parse_qs(parsed.query)
         xsec_token = qs.get("xsec_token", [""])[0]
         xsec_source = qs.get("xsec_source", [""])[0]

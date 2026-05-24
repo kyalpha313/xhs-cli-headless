@@ -163,6 +163,11 @@ class XhsClient(
             raise SignatureError()
         if code == -100:
             raise SessionExpiredError()
+        if code == -101:
+            raise SessionExpiredError(
+                "No login information was accepted by Xiaohongshu — please re-login with: xhs login",
+                code=-101,
+            )
 
         raise XhsApiError(
             f"API error: {json.dumps(data)[:300]}",

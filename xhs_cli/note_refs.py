@@ -10,12 +10,18 @@ from .formatter import parse_note_reference
 
 def resolve_note_reference(id_or_url: str, *, xsec_token: str = "") -> tuple[str, str, str]:
     """Resolve a note reference from URL/ID or the last listing index."""
+    if "xhslink.com" in id_or_url:
+        raise click.UsageError(
+            "xhslink.com short links are not expanded by the CLI. "
+            "Open or expand the short link first, then retry with the full xiaohongshu.com note URL."
+        )
+
     if id_or_url.isdigit():
         entry = get_note_by_index(int(id_or_url))
         if entry is None:
             raise click.UsageError(
                 f"Index {id_or_url} not found — run a listing command first "
-                "(search / feed / hot / user-posts / favorites / my-notes)"
+                "(search / feed / hot / board / my-notes)"
             )
         return (
             entry["note_id"],

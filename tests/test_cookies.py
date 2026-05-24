@@ -1,6 +1,7 @@
 """Unit tests for cookie management (no network required)."""
 
 import time
+from pathlib import Path
 
 import pytest
 
@@ -64,6 +65,21 @@ class TestConfigDirResolution:
         home_dir = tmp_path / "home"
         temp_root = tmp_path / "tmp-root"
         fallback = temp_root / ".xiaohongshu-cli"
+
+        monkeypatch.delenv("XHS_CONFIG_DIR", raising=False)
+        monkeypatch.setattr("xhs_cli.cookies.Path.home", lambda: home_dir)
+        monkeypatch.setattr("xhs_cli.cookies.tempfile.gettempdir", lambda: str(temp_root))
+        monkeypatch.setattr(
+            "xhs_cli.cookies._is_writable_dir",
+            lambda path: path == fallback,
+        )
+
+        assert get_config_dir() == fallback
+
+    def test_falls_back_to_private_tmp_when_other_dirs_are_unwritable(self, tmp_path, monkeypatch):
+        home_dir = tmp_path / "home"
+        temp_root = tmp_path / "tmp-root"
+        fallback = Path("/private/tmp") / ".xiaohongshu-cli"
 
         monkeypatch.delenv("XHS_CONFIG_DIR", raising=False)
         monkeypatch.setattr("xhs_cli.cookies.Path.home", lambda: home_dir)

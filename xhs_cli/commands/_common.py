@@ -91,8 +91,9 @@ def exit_for_error(
     message = str(exc)
     if prefix:
         message = f"{prefix}: {message}"
+    details = getattr(exc, "recovery", None)
 
-    if emit_error(error_code_for_exception(exc), message, as_json=as_json, as_yaml=as_yaml):
+    if emit_error(error_code_for_exception(exc), message, as_json=as_json, as_yaml=as_yaml, details=details):
         raise SystemExit(1) from None
 
     print_error(message)
