@@ -1,18 +1,17 @@
 """xhs-cli-headless: Xiaohongshu CLI via reverse-engineered API."""
 
+import re
 from pathlib import Path
-
-import tomllib
 
 
 def _source_version() -> str | None:
     pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
     try:
-        data = tomllib.loads(pyproject.read_text())
-    except (OSError, tomllib.TOMLDecodeError):
+        text = pyproject.read_text()
+    except OSError:
         return None
-    version_value = data.get("project", {}).get("version")
-    return str(version_value) if version_value else None
+    match = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', text)
+    return match.group(1) if match else None
 
 
 try:

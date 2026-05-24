@@ -1,11 +1,11 @@
 """Tests for CLI commands using Click's test runner."""
 
 import json
+import re
 from pathlib import Path
 
 import click
 import pytest
-import tomllib
 import yaml
 from click.testing import CliRunner
 
@@ -58,7 +58,7 @@ class TestCliBasic:
 
     def test_runtime_version_matches_pyproject(self):
         pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
-        version = tomllib.loads(pyproject.read_text())["project"]["version"]
+        version = re.search(r'(?m)^version\s*=\s*"([^"]+)"\s*$', pyproject.read_text()).group(1)
         assert __version__ == version
 
     def test_help(self):
