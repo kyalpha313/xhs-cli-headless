@@ -39,10 +39,9 @@ def normalize_user_info(data: dict[str, Any]) -> dict[str, Any]:
 
 def normalize_note_detail(data: dict[str, Any]) -> dict[str, Any] | None:
     items = data.get("items", [])
-    if not items:
+    note = items[0].get("note_card", {}) if items else data.get("note_card", data)
+    if not note:
         return None
-
-    note = items[0].get("note_card", {})
     user = note.get("user", {})
     interact = note.get("interact_info", {})
     tags = note.get("tag_list", [])

@@ -79,24 +79,25 @@ uv build
 
 Current distribution recommendation:
 
-- GitHub source install
-- `uv tool install git+https://github.com/kyalpha313/xhs-cli-headless`
+- PyPI install after the release workflow publishes `xhs-cli-headless`
+- GitHub source install remains available for unreleased commits:
+  - `uv tool install git+https://github.com/kyalpha313/xhs-cli-headless`
 
-Planned additional distribution target:
+Package name:
 
-- PyPI release, after package name / ownership is confirmed
-- planned package name: `xhs-cli-headless`
+- `xhs-cli-headless`
 
 Current non-goals:
 
 - No unstable commands in the default CLI surface
-- No Agent skill definitions in this repository
+- No direct browser automation embedded in the CLI runtime
 
-## F. Next Repository
+## F. Bundled Agent Skills
 
-The future skill repository should:
+The release package should include:
 
-- stay separate from the CLI repository
-- only wrap the stable CLI command surface
-- provide Human quick start and Agent quick start
-- link back to this CLI repository for installation and release assets
+- `skills/SKILL.md`
+- `skills/xhs-*/*.md`
+- `references/*.md`
+- `scripts/run_xhs.py`
+- `scripts/smoke_check.py`

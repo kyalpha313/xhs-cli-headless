@@ -71,10 +71,99 @@ def extract_note_from_state(
     raise XhsApiError("Note not found in HTML state")
 
 
+def _image_url(image: dict[str, Any]) -> str:
+    url = image.get("url") or ""
+    if url:
+        return url
+    info_list = image.get("infoList") or image.get("info_list") or []
+    if isinstance(info_list, list):
+        for item in info_list:
+            if isinstance(item, dict) and item.get("url"):
+                return str(item["url"])
+    return ""
+
+
+def _normalize_mobile_note(note: dict[str, Any]) -> dict[str, Any]:
+    user = note.get("user") or {}
+    interact = note.get("interactInfo") or note.get("interact_info") or {}
+    images = note.get("imageList") or note.get("image_list") or []
+    tags = note.get("tagList") or note.get("tag_list") or []
+    normalized_images = [
+        {
+            "url": _image_url(image),
+            "width": image.get("width", 0),
+            "height": image.get("height", 0),
+            "file_id": image.get("fileId") or image.get("file_id") or "",
+        }
+        for image in images
+        if isinstance(image, dict) and _image_url(image)
+    ]
+    return {
+        "note_id": note.get("noteId") or note.get("note_id") or note.get("id") or "",
+        "title": note.get("title") or note.get("displayTitle") or "",
+        "desc": note.get("desc") or "",
+        "type": note.get("type") or "",
+        "user": {
+            "nickname": user.get("nickname") or user.get("nickName") or "",
+            "user_id": user.get("userId") or user.get("user_id") or user.get("id") or "",
+            "avatar": user.get("avatar") or user.get("image") or "",
+        },
+        "interact_info": {
+            "liked_count": interact.get("likedCount") or interact.get("liked_count") or "0",
+            "collected_count": interact.get("collectedCount") or interact.get("collected_count") or "0",
+            "comment_count": interact.get("commentCount") or interact.get("comment_count") or "0",
+            "share_count": interact.get("shareCount") or interact.get("share_count") or "0",
+        },
+        "tag_list": [
+            {"name": tag.get("name") or tag.get("tagName") or ""}
+            for tag in tags
+            if isinstance(tag, dict) and (tag.get("name") or tag.get("tagName"))
+        ],
+        "image_list": normalized_images,
+    }
+
+
+def extract_note_from_mobile_state(state: dict[str, Any], note_id: str) -> dict[str, Any]:
+    note_data = state.get("noteData", {})
+    data = note_data.get("data", {}) if isinstance(note_data, dict) else {}
+    note = data.get("noteData", {}) if isinstance(data, dict) else {}
+    if not isinstance(note, dict) or not note:
+        raise XhsApiError("Note not found in mobile HTML state")
+
+    normalized = _normalize_mobile_note(note)
+    if note_id and normalized["note_id"] and normalized["note_id"] != note_id:
+        raise XhsApiError("Note not found in mobile HTML state")
+
+    comment_page = data.get("commentData", {}) if isinstance(data, dict) else {}
+    return {
+        "items": [
+            {
+                "id": normalized["note_id"],
+                "note_card": normalized,
+            }
+        ],
+        "comments": comment_page.get("comments", []) if isinstance(comment_page, dict) else [],
+        "comment_page": comment_page if isinstance(comment_page, dict) else {},
+        "source": "html",
+    }
+
+
 def extract_note_from_html(html: str, note_id: str) -> dict[str, Any]:
     """High-level: parse HTML → extract note in one step."""
     state = parse_initial_state(html)
-    return extract_note_from_state(state, note_id)
+    try:
+        return extract_note_from_mobile_state(state, note_id)
+    except XhsApiError:
+        note = extract_note_from_state(state, note_id)
+        return {
+            "items": [
+                {
+                    "id": note_id,
+                    "note_card": note,
+                }
+            ],
+            "source": "html",
+        }
 
 
 def parse_initial_ssr_state(html: str) -> dict[str, Any]:
