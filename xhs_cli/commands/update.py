@@ -6,6 +6,7 @@ import json
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -44,31 +45,50 @@ def detect_install_method() -> str:
         return "pipx"
     if "/uv/tools/" in prefix or "/uv/tools/" in executable_lower or "\\uv\\tools\\" in executable_lower:
         return "uv"
-    if shutil.which("uv"):
+    if find_executable("uv"):
         return "uv"
-    if shutil.which("pipx"):
+    if find_executable("pipx"):
         return "pipx"
     return "pip"
+
+
+def find_executable(name: str) -> str | None:
+    """Find an executable on PATH, next to xhs, or in the user-local bin."""
+    found = shutil.which(name)
+    if found:
+        return found
+
+    candidates = [
+        Path(sys.argv[0]).expanduser().resolve().parent / name,
+        Path.home() / ".local" / "bin" / name,
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def build_update_command(*, source: str, method: str) -> list[str]:
     """Build the update command without executing it."""
     if source == "github":
-        if not shutil.which("uv"):
+        uv = find_executable("uv")
+        if not uv:
             raise XhsApiError(
                 "Updating from GitHub requires uv. Install uv first or use: xhs update --source pypi",
                 code="update_unavailable",
             )
-        return ["uv", "tool", "install", "--force", GITHUB_INSTALL_SPEC]
+        return [uv, "tool", "install", "--force", GITHUB_INSTALL_SPEC]
 
     if method == "uv":
-        if not shutil.which("uv"):
+        uv = find_executable("uv")
+        if not uv:
             raise XhsApiError("uv was selected but is not available on PATH.", code="update_unavailable")
-        return ["uv", "tool", "upgrade", PACKAGE_NAME]
+        return [uv, "tool", "upgrade", PACKAGE_NAME]
     if method == "pipx":
-        if not shutil.which("pipx"):
+        pipx = find_executable("pipx")
+        if not pipx:
             raise XhsApiError("pipx was selected but is not available on PATH.", code="update_unavailable")
-        return ["pipx", "upgrade", PACKAGE_NAME]
+        return [pipx, "upgrade", PACKAGE_NAME]
     if method == "pip":
         return [sys.executable, "-m", "pip", "install", "--upgrade", PACKAGE_NAME]
     raise XhsApiError(f"Unsupported update method: {method}", code="update_unavailable")
