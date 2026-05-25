@@ -1,8 +1,8 @@
 # Release Validation Evidence
 
-Updated: 2026-05-24
+Updated: 2026-05-25
 
-这份文档记录 `0.8.6` 的验证口径。命令是否默认支持、隐藏或不承诺，请以 [docs/capability-status.md](docs/capability-status.md) 为准。
+这份文档记录 `0.8.7` 的验证口径。命令是否默认支持、隐藏或不承诺，请以 [docs/capability-status.md](docs/capability-status.md) 为准。
 
 ## 自动化验证
 
@@ -27,6 +27,8 @@ uv run pytest -m smoke tests/test_smoke.py -q
 - `/user/profile/<user_id>/<note_id>` URL 解析
 - 当前移动端 SSR HTML fallback 的正文、图片和首屏评论解析
 - `xhslink.com` 短链接明确提示先展开
+- `xhs update --check`、`xhs update --dry-run` 和更新失败结构化错误
+- wheel 强制包含文件同时进入 sdist，避免 `uv build` 从源码包构建 wheel 失败
 
 ## 真实验证建议
 
@@ -42,6 +44,8 @@ https://www.xiaohongshu.com/user/profile/5c5a2a8b000000001a03d400/6a12f84b000000
 xhs auth doctor --json
 xhs read '<上方 URL>' --json
 xhs comments '<上方 URL>' --json
+xhs update --check --json
+xhs update --dry-run --json
 ```
 
 ## 历史失败仍不默认承诺
@@ -63,3 +67,4 @@ xhs comments '<上方 URL>' --json
 - `docs/capability-status.md` 是否与实际 `xhs --help` 一致
 - `skills/` 和 `references/` 是否与当前能力边界一致
 - 结构化错误是否仍符合 `SCHEMA.md`
+- `uv build` 是否能一次性生成 sdist 和 wheel

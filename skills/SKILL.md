@@ -12,6 +12,7 @@
 - 搜索笔记、用户、话题、推荐流、热榜
 - 阅读笔记正文、图片、评论、board、我的笔记、未读数量
 - 执行评论、回复、点赞、收藏、关注等互动操作
+- 更新 CLI 与随包发布的 Agent skill
 - 对搜索、正文或评论结果做整理和摘要
 
 ## 路由原则
@@ -20,6 +21,7 @@
 - 登录问题先走 `xhs auth doctor`。
 - 默认只调用当前稳定命令面。
 - 写操作必须得到用户明确确认。
+- 更新请求优先使用 `xhs update --check --json` 和 `xhs update --dry-run`。
 - 已知失败或隐藏命令不能静默尝试。
 - 返回用户可消费的摘要，不直接铺开超长原始输出。
 
@@ -30,6 +32,13 @@
 - `skills/xhs-read/SKILL.md`：正文、评论、board、我的笔记、未读
 - `skills/xhs-social/SKILL.md`：评论、回复、点赞、收藏、关注
 - `skills/xhs-ops/SKILL.md`：组合读取、摘要、轻量分析
+
+## 更新命令
+
+- 检查版本：`xhs update --check --json`
+- 预览更新：`xhs update --dry-run --json`
+- 执行更新：`xhs update`
+- GitHub 源更新：`xhs update --source github`
 
 ## 关键参考
 

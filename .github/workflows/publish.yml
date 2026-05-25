@@ -50,27 +50,20 @@ jobs:
             dist/*.tar.gz
 
   publish-pypi:
-    needs: verify
+    needs: [verify, release-assets]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
         with:
-          python-version: "3.12"
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v6
-
-      - name: Clean dist
-        run: rm -f dist/*
-
-      - name: Build package
-        run: uv build
+          name: dist-${{ github.ref_name }}
+          path: dist/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

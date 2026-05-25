@@ -1,8 +1,8 @@
 # 能力状态总览
 
-更新时间：2026-05-24
+更新时间：2026-05-25
 
-这份文档说明 `xhs-cli-headless` `0.8.6` 当前对外承诺的能力边界。这里的“支持”指默认命令面和 Agent skill 都可以路由；“隐藏 / 不承诺”指源码可能存在，但不建议 Agent 默认调用。
+这份文档说明 `xhs-cli-headless` `0.8.7` 当前对外承诺的能力边界。这里的“支持”指默认命令面和 Agent skill 都可以路由；“隐藏 / 不承诺”指源码可能存在，但不建议 Agent 默认调用。
 
 ## 默认支持
 
@@ -19,6 +19,7 @@
 | `xhs auth import --file` | 支持 | 导入 cookies 文件 |
 | `xhs auth import-fields --interactive` | 支持 | 交互式导入关键字段 |
 | `xhs logout` | 支持 | 清空本地登录态 |
+| `xhs update` | 支持 | 更新 CLI 和随包发布的 Agent skill |
 
 ### 只读发现与阅读
 
@@ -48,7 +49,7 @@
 
 ## 内置 Agent Skill
 
-`0.8.6` 起，本仓库内置 Agent 文档：
+`0.8.6` 起，本仓库内置 Agent 文档；`0.8.7` 起可通过 `xhs update` 更新 CLI 与这些内置 skill：
 
 - `skills/SKILL.md`
 - `skills/xhs-auth/SKILL.md`

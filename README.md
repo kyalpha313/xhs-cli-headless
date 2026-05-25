@@ -8,7 +8,7 @@
 - 用稳定命令读取、搜索和整理小红书内容
 - 把 CLI 与 Agent skill 一起发布，安装一个包即可同时获得程序和使用指南
 
-当前版本：`0.8.6`
+当前版本：`0.8.7`
 
 ## 适合谁用
 
@@ -36,6 +36,24 @@ cd xhs-cli-headless
 uv sync
 uv run xhs --help
 ```
+
+## 更新
+
+`0.8.7` 起，可以用内置命令更新 CLI 和随包发布的 Agent skill：
+
+```bash
+xhs update --check --json
+xhs update --dry-run
+xhs update
+```
+
+如果你使用 GitHub 源安装：
+
+```bash
+xhs update --source github
+```
+
+`xhs update` 会优先识别 `uv tool`、`pipx`、`pip` 等常见安装方式。无法安全判断时，请先用 `--dry-run` 查看将执行的命令。
 
 ## 快速开始
 
@@ -94,6 +112,7 @@ xhs status --json
 | `xhs auth import --file` | 导入 cookies 文件 |
 | `xhs auth import-fields --interactive` | 交互式粘贴关键字段 |
 | `xhs logout` | 清空本地登录态 |
+| `xhs update` | 更新命令行和内置 Agent skill |
 
 ### 搜索与阅读
 
@@ -161,7 +180,7 @@ xhs read "https://www.xiaohongshu.com/user/profile/<user_id>/<note_id>?xsec_toke
 
 ## 内置 Agent Skill
 
-`0.8.6` 起，本仓库内置 Agent 使用指南：
+`0.8.6` 起，本仓库内置 Agent 使用指南；`0.8.7` 起可通过 `xhs update` 一并更新 CLI 和这些 skill：
 
 - `skills/SKILL.md`
 - `skills/xhs-auth/SKILL.md`

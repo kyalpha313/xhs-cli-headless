@@ -32,6 +32,8 @@ def error_code_for_exception(exc: Exception) -> str:
             "ip_blocked",
             "signature_error",
             "unsupported_operation",
+            "update_unavailable",
+            "update_failed",
             "api_error",
         }:
             return str(exc.code)

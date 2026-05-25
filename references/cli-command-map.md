@@ -14,6 +14,7 @@
 | 导入 cookies 文件 | `xhs auth import --file <file> --json` |
 | 交互式导入字段 | `xhs auth import-fields --interactive` |
 | 退出登录 | `xhs logout --json` |
+| 更新 CLI 和内置 skill | `xhs update --check --json` 后按需执行 `xhs update` |
 
 ## 搜索与发现
 

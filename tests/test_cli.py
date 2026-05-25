@@ -104,7 +104,7 @@ class TestCliBasic:
         }
         commands_expected = [
             # Auth
-            "auth", "login", "status", "logout", "whoami",
+            "auth", "login", "status", "logout", "whoami", "update",
             # Reading
             "search", "read", "comments", "feed", "hot", "topics", "search-user", "my-notes",
             "unread",

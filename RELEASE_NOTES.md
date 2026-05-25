@@ -1,3 +1,26 @@
+# v0.8.7
+
+## 新功能
+
+- 新增 `xhs update`
+  - `xhs update --check` 检查当前版本与最新版本
+  - `xhs update --dry-run` 只展示将执行的更新命令
+  - `xhs update --source github` 支持从 GitHub 源更新
+  - 更新 CLI 的同时也更新随包发布的 Agent skill
+
+## 发布链路修复
+
+- 修复 `release_test_matrix.md` 未进入 sdist 导致 `uv build` 从源码包构建 wheel 失败的问题
+- 简化 GitHub 发布 workflow：发布资产构建一次，PyPI 发布复用同一份 dist artifact
+- 保留 CI。它在 `v0.8.6` 发布中抓到了真实问题：
+  - Python 3.10 不支持 `tomllib`
+  - sdist/wheel 包含规则不一致
+
+## 验证
+
+- 新增 `xhs update` 行为测试
+- 新增发布打包规则测试，确保 wheel 强制包含的文件也进入 sdist
+
 # v0.8.6
 
 ## 新功能
