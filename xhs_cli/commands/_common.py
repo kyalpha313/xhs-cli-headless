@@ -39,9 +39,21 @@ def get_client(ctx, *, force_refresh: bool = False) -> XhsClient:
     return XhsClient(cookies)
 
 
+def get_public_client(ctx) -> XhsClient:
+    """Get a client that can use saved cookies when present, or anonymous HTML otherwise."""
+    del ctx
+    return XhsClient(load_saved_cookies() or {})
+
+
 def run_client_action(ctx, action: Callable[[XhsClient], T]) -> T:
     """Run an authenticated client action using the saved session only."""
     with get_client(ctx) as client:
+        return action(client)
+
+
+def run_public_client_action(ctx, action: Callable[[XhsClient], T]) -> T:
+    """Run a read-only action that may fall back to public HTML without cookies."""
+    with get_public_client(ctx) as client:
         return action(client)
 
 
@@ -63,6 +75,27 @@ def handle_command(
             render(data)
         return data
     except (XhsApiError, NoCookieError) as exc:
+        exit_for_error(exc, as_json=as_json, as_yaml=as_yaml, prefix=prefix)
+
+
+def handle_public_command(
+    ctx,
+    *,
+    action: Callable[[XhsClient], T],
+    render: Callable[[T], None] | None,
+    as_json: bool,
+    as_yaml: bool,
+    prefix: str | None = None,
+):
+    """Run a public read action, emit structured output if requested, else render."""
+    from ..formatter import maybe_print_structured
+
+    try:
+        data = run_public_client_action(ctx, action)
+        if not maybe_print_structured(data, as_json=as_json, as_yaml=as_yaml) and render:
+            render(data)
+        return data
+    except XhsApiError as exc:
         exit_for_error(exc, as_json=as_json, as_yaml=as_yaml, prefix=prefix)
 
 

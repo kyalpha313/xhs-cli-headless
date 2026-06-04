@@ -31,6 +31,8 @@
 | 用户意图 | 推荐命令 |
 | --- | --- |
 | 读取笔记详情 | `xhs read <note_id_or_url> --json` |
+| 读取 `xhslink.com` 短链 | `xhs read <xhslink.com_url> --json`，CLI 会安全展开到 `xiaohongshu.com` |
+| 读取公开视频 / 公开笔记 | 先 `xhs read <url> --json`，即使未登录也尝试 HTML fallback |
 | 查看评论 | `xhs comments <note_id_or_url> --json` |
 | 查看收藏专辑/board | `xhs board <board_id_or_url> --json` |
 | 查看我的笔记 | `xhs my-notes --json` |
@@ -55,4 +57,5 @@
 - 搜索后总结：`search -> read -> comments -> summarize`
 - 评论区观点整理：`read -> comments -> summarize`
 - board 内容整理：`board -> summarize`
-- 登录恢复：`auth doctor -> login` 或 `auth import`
+- 公开视频短链解析：`read <xhslink.com_url>`，短链展开和 HTML fallback 成功前不要求登录
+- 登录恢复：非公开读取命令失败后再走 `auth doctor -> login` 或 `auth import`

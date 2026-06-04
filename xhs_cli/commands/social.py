@@ -9,7 +9,7 @@ import click
 from ..command_normalizers import normalize_paged_notes, resolve_current_user_id
 from ..formatter import print_info, print_success, render_user_posts
 from ..note_refs import save_index_from_notes
-from ._common import handle_command, run_client_action, structured_output_options
+from ._common import handle_command, handle_public_command, run_client_action, structured_output_options
 
 
 def _resolve_user_id(ctx, user_id: str | None) -> str:
@@ -140,4 +140,4 @@ def board(ctx, board_id_or_url: str, as_json: bool, as_yaml: bool):
         if note_count is not None:
             print_info(f"Board note count: {note_count}")
 
-    handle_command(ctx, action=_action, render=_render, as_json=as_json, as_yaml=as_yaml)
+    handle_public_command(ctx, action=_action, render=_render, as_json=as_json, as_yaml=as_yaml)

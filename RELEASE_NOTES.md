@@ -1,3 +1,15 @@
+# Unreleased
+
+## 行为修复
+
+- `xhs read` 支持自动展开 `xhslink.com` 短链接，并限制最终 URL 必须属于 `xiaohongshu.com`。
+- 公开视频 / 公开笔记 URL 在没有登录态时也会尝试 HTML fallback，不再被 `not_authenticated` 预先阻断。
+- `xhs board` 改为公开 HTML fallback 路径，不要求先存在本地 cookies。
+
+## Agent 规则
+
+- 更新内置 skill 和参考文档：公开视频短链解析应先走“短链展开 + HTML fallback”，fallback 失败后再引导登录。
+
 # v0.8.7
 
 ## 新功能

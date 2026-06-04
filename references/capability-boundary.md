@@ -25,9 +25,9 @@
 - `xhs topics`
 - `xhs feed`
 - `xhs hot`
-- `xhs read`
+- `xhs read`（公开 `xiaohongshu.com` URL / `xhslink.com` 短链可匿名走 HTML fallback）
 - `xhs comments`
-- `xhs board`
+- `xhs board`（通过公开 HTML fallback，不要求先登录）
 - `xhs my-notes`
 - `xhs unread`
 
@@ -61,6 +61,7 @@
 | 查看新消息数量 | `notifications` | `unread` |
 | 查看用户主页/发帖 | `user` / `user-posts` | 说明当前不承诺 |
 | 删除自己发布的笔记 | `delete` | 说明当前不承诺 |
+| 读取公开视频短链 | 手动要求用户展开或先登录 | `read <xhslink.com_url>`，自动安全展开后匿名 HTML fallback |
 
 ## 文档同步
 

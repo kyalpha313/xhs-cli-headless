@@ -16,8 +16,14 @@ from ..formatter import (
     render_user_posts,
     render_users,
 )
-from ..note_refs import resolve_note_reference, save_index_from_items, save_index_from_notes
-from ._common import exit_for_error, handle_command, run_client_action, structured_output_options
+from ..note_refs import (
+    is_xhs_short_link,
+    is_xiaohongshu_url,
+    resolve_note_reference,
+    save_index_from_items,
+    save_index_from_notes,
+)
+from ._common import exit_for_error, handle_command, handle_public_command, run_client_action, structured_output_options
 
 # ─── Token propagation ─────────────────────────────────────────────────────
 
@@ -48,6 +54,11 @@ TYPE_MAP = {
     "video": 1,
     "image": 2,
 }
+
+
+def _can_use_public_note_read(id_or_url: str) -> bool:
+    """Only public URL inputs can bypass the saved-session preflight."""
+    return is_xiaohongshu_url(id_or_url) or is_xhs_short_link(id_or_url)
 
 
 @click.command()
@@ -86,6 +97,7 @@ def search(ctx, keyword: str, sort: str, note_type: str, page: int, as_json: boo
 @click.pass_context
 def read(ctx, id_or_url: str, xsec_token: str, as_json: bool, as_yaml: bool):
     """Read a note by ID, URL, or short index."""
+    handler = handle_public_command if _can_use_public_note_read(id_or_url) else handle_command
     note_id, token, url_source = resolve_note_reference(id_or_url, xsec_token=xsec_token)
     xsec_source = url_source or "pc_feed"
     if token:
@@ -97,7 +109,7 @@ def read(ctx, id_or_url: str, xsec_token: str, as_json: bool, as_yaml: bool):
             kwargs["xsec_source"] = url_source
         return client.get_note_detail(note_id, **kwargs)
 
-    handle_command(
+    handler(
         ctx,
         action=_read_action,
         render=render_note,

@@ -1,6 +1,6 @@
 # 能力状态总览
 
-更新时间：2026-05-25
+更新时间：2026-06-04
 
 这份文档说明 `xhs-cli-headless` `0.8.7` 当前对外承诺的能力边界。这里的“支持”指默认命令面和 Agent skill 都可以路由；“隐藏 / 不承诺”指源码可能存在，但不建议 Agent 默认调用。
 
@@ -30,9 +30,9 @@
 | `xhs topics` | 支持 | 搜索话题 |
 | `xhs feed` | 支持 | 推荐流 |
 | `xhs hot` | 支持 | 热榜 |
-| `xhs read` | 支持 | 支持标准 note URL；HTML fallback 可解析当前移动端 SSR 结构 |
+| `xhs read` | 支持 | 支持标准 note URL 和 `xhslink.com` 短链；公开视频 / 公开笔记可匿名走 HTML fallback |
 | `xhs comments` | 支持 | 评论 API 通常需要有效登录态和 `xsec_token` |
-| `xhs board` | 支持 | 通过 HTML fallback 读取收藏专辑 |
+| `xhs board` | 支持 | 通过 HTML fallback 读取收藏专辑；不要求先登录 |
 | `xhs my-notes` | 支持 | creator 列表 |
 | `xhs unread` | 支持 | 未读数量 |
 
@@ -84,4 +84,4 @@
 - 通知详情：当前仅承诺 `xhs unread`
 - 用户主页 / 用户发帖：当前不承诺稳定读取
 - 删除笔记：当前不承诺稳定执行
-- 短链接：先展开 `xhslink.com`，再把标准 `xiaohongshu.com` URL 传给 `xhs read`
+- 短链接：`xhs read <xhslink.com_url>` 会自动安全展开；最终 URL 必须属于 `xiaohongshu.com`

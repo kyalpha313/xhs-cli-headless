@@ -737,3 +737,22 @@ window.__INITIAL_SSR_STATE__ = {"Main":{"albumInfo":{"title":"Board Title"},"not
 
         assert result["items"][0]["note_card"]["title"] == "html-ok"
         assert get_cached_note_context("note-123") == {}
+
+    def test_get_note_detail_without_a1_uses_html_even_with_token(self, monkeypatch):
+        def fail_feed_api(self, note_id, xsec_token="", xsec_source="pc_feed"):
+            pytest.fail("anonymous note reads should not attempt the signed feed API")
+
+        def fake_get_note_from_html(self, note_id, xsec_token="", xsec_source="pc_feed"):
+            return {"items": [{"note_card": {"title": "html-ok"}}], "source": "html"}
+
+        monkeypatch.setattr(XhsClient, "get_note_by_id", fail_feed_api)
+        monkeypatch.setattr(XhsClient, "get_note_from_html", fake_get_note_from_html)
+
+        client = XhsClient({})
+        try:
+            result = client.get_note_detail("note-123", xsec_token="token-abc", xsec_source="pc_search")
+        finally:
+            client.close()
+
+        assert result["items"][0]["note_card"]["title"] == "html-ok"
+        assert result["source"] == "html"

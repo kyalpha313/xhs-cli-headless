@@ -95,6 +95,8 @@ xhs auth import-fields --interactive
 xhs status --json
 ```
 
+例外：如果用户只是读取公开视频 / 公开笔记 URL，或给出 `xhslink.com` 短链接，先尝试 `xhs read`。公开内容可以走 HTML fallback，不应把登录失效当作硬阻塞；只有 fallback 也失败、或用户需要评论 / feed / 互动等登录能力时，再引导登录。
+
 结构化错误会带 `details.steps`，Agent 可以直接按步骤引导用户完成恢复。
 
 ## 支持能力
@@ -169,14 +171,16 @@ xhs unfollow <user_id>
 
 ## 短链接说明
 
-`xhs read` 支持标准小红书笔记 URL，例如：
+`xhs read` 支持标准小红书笔记 URL；公开 URL 在没有登录态时也会尝试 HTML fallback，例如：
 
 ```bash
 xhs read "https://www.xiaohongshu.com/explore/<note_id>?xsec_token=...&xsec_source=..."
 xhs read "https://www.xiaohongshu.com/user/profile/<user_id>/<note_id>?xsec_token=...&xsec_source=..."
 ```
 
-`xhslink.com` 短链接当前不会在 CLI 内自动展开。请先展开成标准 `xiaohongshu.com` 链接后再传给 `xhs read`。
+`xhslink.com` 短链接会先通过 HTTP 跳转展开，再交给 `xhs read`。CLI 只接受最终跳转到 `xiaohongshu.com` 或其子域的 URL；如果短链无法展开或跳到其他域名，会直接拒绝。
+
+登录仍然有价值：有效登录态通常能获取更多 API 字段，也会影响评论、feed、互动、账号相关和受限内容。但公开视频 / 公开笔记读取不再被缺失登录态预先阻断。
 
 ## 内置 Agent Skill
 

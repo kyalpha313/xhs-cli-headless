@@ -428,7 +428,7 @@ class ReadingEndpointsMixin:
         token = xsec_token or cached.get("token", "")
         source = xsec_source or cached.get("source", "") or "pc_feed"
         used_cached_context = not xsec_token and bool(cached.get("token"))
-        if token:
+        if token and self.cookies.get("a1"):
             try:
                 return self.get_note_by_id(note_id, xsec_token=token, xsec_source=source)
             except (NeedVerifyError, XhsApiError) as exc:

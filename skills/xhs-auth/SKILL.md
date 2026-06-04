@@ -24,6 +24,8 @@
 
 ## 默认流程
 
+例外：用户只是读取公开视频 / 公开笔记 URL、`xhslink.com` 短链或 board 时，不要因为未登录直接要求 `xhs login`。先交给 `xhs-read` 路径尝试公开 HTML fallback；fallback 失败或用户需要评论、feed、互动、账号相关能力时，再进入下面流程。
+
 遇到认证问题时：
 
 1. 先运行 `xhs auth doctor --json`。

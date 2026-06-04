@@ -717,6 +717,88 @@ class TestCliBasic:
             for step in payload["error"]["details"]["steps"]
         ]
 
+    def test_read_full_url_uses_public_html_path_without_saved_cookies(self, monkeypatch):
+        monkeypatch.setattr("xhs_cli.commands._common.load_saved_cookies", lambda: None)
+        called = {}
+
+        def fake_get_note_detail(self, note_id, **kwargs):
+            called["cookies"] = self.cookies
+            called["note_id"] = note_id
+            called["kwargs"] = kwargs
+            return {**FAKE_NOTE_RESPONSE, "source": "html"}
+
+        monkeypatch.setattr("xhs_cli.client.XhsClient.get_note_detail", fake_get_note_detail)
+
+        result = runner.invoke(
+            cli,
+            ["read", "https://www.xiaohongshu.com/explore/note-abc?xsec_token=tok&xsec_source=pc_search", "--json"],
+        )
+
+        assert result.exit_code == 0
+        assert called == {
+            "cookies": {},
+            "note_id": "note-abc",
+            "kwargs": {"xsec_token": "tok", "xsec_source": "pc_search"},
+        }
+        payload = json.loads(result.output)
+        assert payload["ok"] is True
+        assert payload["data"]["source"] == "html"
+
+    def test_read_short_link_expands_before_public_read(self, monkeypatch):
+        monkeypatch.setattr("xhs_cli.commands._common.load_saved_cookies", lambda: None)
+        monkeypatch.setattr(
+            "xhs_cli.note_refs.expand_xhs_short_link",
+            lambda url: "https://www.xiaohongshu.com/discovery/item/note-abc?xsec_token=tok&xsec_source=pc_search",
+            raising=False,
+        )
+        called = {}
+
+        def fake_get_note_detail(self, note_id, **kwargs):
+            called["cookies"] = self.cookies
+            called["note_id"] = note_id
+            called["kwargs"] = kwargs
+            return {**FAKE_NOTE_RESPONSE, "source": "html"}
+
+        monkeypatch.setattr("xhs_cli.client.XhsClient.get_note_detail", fake_get_note_detail)
+
+        result = runner.invoke(cli, ["read", "http://xhslink.com/o/abc", "--json"])
+
+        assert result.exit_code == 0
+        assert called["cookies"] == {}
+        assert called["note_id"] == "note-abc"
+        assert called["kwargs"] == {"xsec_token": "tok", "xsec_source": "pc_search"}
+
+    def test_short_link_refuses_non_xhs_redirect(self, monkeypatch):
+        from xhs_cli import note_refs
+
+        monkeypatch.setattr(
+            note_refs,
+            "expand_xhs_short_link",
+            lambda url: "https://example.com/explore/note-abc",
+            raising=False,
+        )
+
+        result = runner.invoke(cli, ["read", "http://xhslink.com/o/abc"])
+
+        assert result.exit_code != 0
+        assert "xiaohongshu.com" in result.output
+
+    def test_board_uses_public_html_path_without_saved_cookies(self, monkeypatch):
+        monkeypatch.setattr("xhs_cli.commands._common.load_saved_cookies", lambda: None)
+        called = {}
+
+        def fake_get_board_from_html(self, board_id):
+            called["cookies"] = self.cookies
+            called["board_id"] = board_id
+            return {"board_id": board_id, "name": "Board A", "notes": []}
+
+        monkeypatch.setattr("xhs_cli.client.XhsClient.get_board_from_html", fake_get_board_from_html)
+
+        result = runner.invoke(cli, ["board", "https://www.xiaohongshu.com/board/board-abc", "--json"])
+
+        assert result.exit_code == 0
+        assert called == {"cookies": {}, "board_id": "board-abc"}
+
     def test_status_reports_not_authenticated_when_session_expired(self, monkeypatch):
         monkeypatch.setenv("OUTPUT", "auto")
 
@@ -904,11 +986,16 @@ class TestCliBasic:
         assert result.exit_code != 0
         assert "999" in result.output
 
-    def test_read_short_link_returns_explicit_usage_error(self):
+    def test_read_short_link_expand_failure_returns_usage_error(self, monkeypatch):
+        def fail_expand(url):
+            raise click.UsageError("Could not expand xhslink.com short link")
+
+        monkeypatch.setattr("xhs_cli.note_refs.expand_xhs_short_link", fail_expand)
+
         result = runner.invoke(cli, ["read", "http://xhslink.com/o/abc"])
 
         assert result.exit_code != 0
-        assert "xhslink.com short links" in result.output
+        assert "Could not expand xhslink.com short link" in result.output
 
     def test_search_empty_results_clear_previous_index(self, monkeypatch):
         from xhs_cli.note_refs import save_index_from_items

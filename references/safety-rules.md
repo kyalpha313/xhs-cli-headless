@@ -30,6 +30,8 @@
 
 ## 登录恢复
 
+例外：如果用户请求的是 `xhs read` 公开 `xiaohongshu.com` URL、`xhslink.com` 短链接，或 `xhs board`，不要因为本地登录态失效而直接停止。先尝试公开 HTML fallback；只有 fallback 失败，或用户请求评论、feed、互动、账号相关能力时，才进入登录恢复流程。
+
 发现 `not_authenticated`、`session_expired`、`No saved login session`、`Session expired` 等错误时，Agent 应按顺序处理：
 
 1. 运行 `xhs auth doctor --json`。
