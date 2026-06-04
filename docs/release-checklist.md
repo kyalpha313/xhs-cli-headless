@@ -8,7 +8,7 @@ Release invariant: every public version bump must be published to both channels 
 - PyPI: publish the same version so default `xhs update` can discover it from PyPI.
 - Verification: after publishing, run `xhs update --check --json` from an older installed version and confirm `latest_version` is the new version.
 
-Automation invariant: publishing a GitHub Release with a `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which builds artifacts, attaches them to the GitHub Release, and publishes the same package version to PyPI. If tag push automation is delayed or skipped, publish the GitHub Release or run the workflow against the release tag; do not publish PyPI by memory as a separate manual step.
+Automation invariant: creating or publishing a GitHub Release with a `vX.Y.Z` tag triggers `.github/workflows/publish.yml`, which builds artifacts, attaches them to the GitHub Release, and publishes the same package version to PyPI. If tag push automation is delayed or skipped, publish the GitHub Release or run the workflow against the release tag; do not publish PyPI by memory as a separate manual step.
 
 Do not treat a `main` push alone as a completed release. If a version exists only on GitHub source, document it as an unreleased/source-only build and tell users to use `xhs update --source github`.
 

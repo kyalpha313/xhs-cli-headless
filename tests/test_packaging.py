@@ -21,7 +21,7 @@ def test_publish_workflow_builds_once_then_reuses_artifact():
 def test_publish_workflow_publishes_when_github_release_is_published():
     workflow = (PROJECT_ROOT / ".github/workflows/publish.yml").read_text()
     assert "release:" in workflow
-    assert "types: [published]" in workflow
+    assert "types: [created, published, released]" in workflow
     assert "release-context:" in workflow
     assert "tag_name: ${{ needs.release-context.outputs.tag_name }}" in workflow
     assert "ref: ${{ needs.release-context.outputs.tag_name }}" in workflow
