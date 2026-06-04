@@ -5,6 +5,7 @@
 - `xhs read` 支持自动展开 `xhslink.com` 短链接，并限制最终 URL 必须属于 `xiaohongshu.com`。
 - 公开视频 / 公开笔记 URL 在没有登录态时也会尝试 HTML fallback，不再被 `not_authenticated` 预先阻断。
 - `xhs board` 改为公开 HTML fallback 路径，不要求先存在本地 cookies。
+- `xhs update --check` 改为按版本号大小判断更新，不再把低于当前版本的 PyPI 最新版误判为可更新。
 
 ## Agent 规则
 

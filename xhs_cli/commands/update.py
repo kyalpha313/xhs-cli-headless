@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -20,6 +21,59 @@ from ._common import handle_errors, structured_output_options
 PACKAGE_NAME = "xhs-cli-headless"
 GITHUB_REPO_URL = "https://github.com/kyalpha313/xhs-cli-headless"
 GITHUB_INSTALL_SPEC = f"git+{GITHUB_REPO_URL}"
+_VERSION_RE = re.compile(r"^\s*v?(?P<release>\d+(?:\.\d+)*)(?P<suffix>.*)\s*$", re.IGNORECASE)
+_PRE_RELEASE_RE = re.compile(r"(a|alpha|b|beta|rc|pre|preview)\.?(?P<number>\d*)", re.IGNORECASE)
+_POST_RELEASE_RE = re.compile(r"(post|rev|r)\.?(?P<number>\d*)", re.IGNORECASE)
+_DEV_RELEASE_RE = re.compile(r"dev\.?(?P<number>\d*)", re.IGNORECASE)
+
+
+def _suffix_key(suffix: str) -> tuple[int, int, int]:
+    suffix = suffix.lower()
+    if not suffix:
+        return (2, 0, 0)
+
+    if match := _DEV_RELEASE_RE.search(suffix):
+        number = int(match.group("number") or 0)
+        return (0, 0, number)
+
+    if match := _PRE_RELEASE_RE.search(suffix):
+        marker = match.group(1).lower()
+        pre_rank = {"a": 0, "alpha": 0, "b": 1, "beta": 1, "rc": 2, "pre": 2, "preview": 2}[marker]
+        number = int(match.group("number") or 0)
+        return (1, pre_rank, number)
+
+    if match := _POST_RELEASE_RE.search(suffix):
+        number = int(match.group("number") or 0)
+        return (3, 0, number)
+
+    return (2, 0, 0)
+
+
+def _parsed_version(version: str) -> tuple[tuple[int, ...], tuple[int, int, int]] | None:
+    match = _VERSION_RE.match(version)
+    if not match:
+        return None
+    release = tuple(int(part) for part in match.group("release").split("."))
+    return release, _suffix_key(match.group("suffix"))
+
+
+def _is_newer_version(latest_version: str | None, current_version: str) -> bool:
+    if not latest_version:
+        return False
+
+    latest = _parsed_version(latest_version)
+    current = _parsed_version(current_version)
+    if latest is None or current is None:
+        return latest_version != current_version
+
+    latest_release, latest_suffix = latest
+    current_release, current_suffix = current
+    release_length = max(len(latest_release), len(current_release))
+    padded_latest = latest_release + (0,) * (release_length - len(latest_release))
+    padded_current = current_release + (0,) * (release_length - len(current_release))
+    if padded_latest != padded_current:
+        return padded_latest > padded_current
+    return latest_suffix > current_suffix
 
 
 def fetch_latest_version(source: str) -> str | None:
@@ -115,7 +169,7 @@ def update(check: bool, dry_run: bool, source: str, as_json: bool, as_yaml: bool
     def _run():
         method = detect_install_method()
         latest_version = fetch_latest_version(source) if check else None
-        update_available = bool(latest_version and latest_version != __version__)
+        update_available = _is_newer_version(latest_version, __version__)
 
         if check:
             payload = {
