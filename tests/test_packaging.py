@@ -16,3 +16,14 @@ def test_publish_workflow_builds_once_then_reuses_artifact():
     assert workflow.count("run: uv build") == 1
     assert "actions/download-artifact" in workflow
     assert "packages-dir: dist/" in workflow
+
+
+def test_publish_workflow_publishes_when_github_release_is_published():
+    workflow = (PROJECT_ROOT / ".github/workflows/publish.yml").read_text()
+    assert "release:" in workflow
+    assert "types: [published]" in workflow
+    assert "release-context:" in workflow
+    assert "tag_name: ${{ needs.release-context.outputs.tag_name }}" in workflow
+    assert "ref: ${{ needs.release-context.outputs.tag_name }}" in workflow
+    assert "name: dist-${{ needs.release-context.outputs.tag_name }}" in workflow
+    assert "skip-existing: true" in workflow

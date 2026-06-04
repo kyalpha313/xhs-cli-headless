@@ -4,20 +4,53 @@ on:
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
+  release-context:
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.resolve.outputs.tag_name }}
+    steps:
+      - name: Resolve release tag
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          if [ "$EVENT_NAME" = "release" ]; then
+            TAG_NAME="$RELEASE_TAG_NAME"
+          else
+            TAG_NAME="$REF_NAME"
+          fi
+
+          case "$TAG_NAME" in
+            v*) ;;
+            *)
+              echo "Expected a v* release tag, got: $TAG_NAME" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
   verify:
+    needs: release-context
     uses: ./.github/workflows/ci.yml
 
   release-assets:
-    needs: verify
+    needs: [release-context, verify]
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.tag_name }}
 
       - uses: actions/setup-python@v5
         with:
@@ -35,22 +68,33 @@ jobs:
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ github.ref_name }}
+          name: dist-${{ needs.release-context.outputs.tag_name }}
           path: |
             dist/*.whl
             dist/*.tar.gz
 
-      - name: Attach artifacts to GitHub release
+      - name: Create GitHub release and attach artifacts
+        if: github.event_name != 'release'
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref_name }}
+          tag_name: ${{ needs.release-context.outputs.tag_name }}
+          name: ${{ needs.release-context.outputs.tag_name }}
           body_path: RELEASE_NOTES.md
           files: |
             dist/*.whl
             dist/*.tar.gz
 
+      - name: Attach artifacts to published GitHub release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-context.outputs.tag_name }}
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+
   publish-pypi:
-    needs: [verify, release-assets]
+    needs: [release-context, verify, release-assets]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -60,10 +104,11 @@ jobs:
       - name: Download dist artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist-${{ github.ref_name }}
+          name: dist-${{ needs.release-context.outputs.tag_name }}
           path: dist/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          skip-existing: true
