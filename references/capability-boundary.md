@@ -1,6 +1,6 @@
 # Capability Boundary
 
-这份文档定义 `xhs` CLI 和内置 skill 在 `0.8.7` 的稳定能力边界。
+这份文档定义 `xhs` CLI 和内置 skill 在 `0.8.8` 的稳定能力边界。
 
 核心原则：只包装稳定 CLI 能力，不把隐藏命令和已知失败命令误暴露给 Agent。
 

@@ -19,13 +19,13 @@ def test_update_help_is_registered():
 
 
 def test_update_check_json_reports_current_and_latest(monkeypatch):
-    monkeypatch.setattr("xhs_cli.commands.update.fetch_latest_version", lambda source: "0.8.8")
+    monkeypatch.setattr("xhs_cli.commands.update.fetch_latest_version", lambda source: "0.8.9")
 
     result = runner.invoke(cli, ["update", "--check", "--json"])
 
     assert result.exit_code == 0
-    assert '"current_version": "0.8.7"' in result.output
-    assert '"latest_version": "0.8.8"' in result.output
+    assert '"current_version": "0.8.8"' in result.output
+    assert '"latest_version": "0.8.9"' in result.output
     assert '"update_available": true' in result.output
 
 

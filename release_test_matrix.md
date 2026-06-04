@@ -2,7 +2,7 @@
 
 Updated: 2026-05-25
 
-这份文档记录 `0.8.7` 的验证口径。命令是否默认支持、隐藏或不承诺，请以 [docs/capability-status.md](docs/capability-status.md) 为准。
+这份文档记录 `0.8.8` 的验证口径。命令是否默认支持、隐藏或不承诺，请以 [docs/capability-status.md](docs/capability-status.md) 为准。
 
 ## 自动化验证
 

@@ -41,4 +41,4 @@ def test_safety_rules_block_unstable_commands_by_default():
 def test_project_version_is_087():
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert 'version = "0.8.7"' in pyproject
+    assert 'version = "0.8.8"' in pyproject
