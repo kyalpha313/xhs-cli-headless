@@ -17,6 +17,7 @@ import random
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 from .client import XhsClient
@@ -349,6 +350,37 @@ def _display_qr_in_terminal(data: str) -> bool:
     return True
 
 
+def _write_qr_image(data: str, output_path: str | Path) -> Path:
+    """Write *data* as a QR PNG and return the written path."""
+    try:
+        import qrcode  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise XhsApiError("Writing a QR image requires the `qrcode` package.") from exc
+
+    path = Path(output_path).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    qr = qrcode.QRCode(border=4)
+    qr.add_data(data)
+    qr.make(fit=True)
+    image = qr.make_image(fill_color="black", back_color="white")
+    image.save(path, format="PNG")
+    return path
+
+
+def _write_qr_output_if_requested(
+    *,
+    qr_url: str,
+    qr_output: str | Path | None,
+    on_status: callable[[str], None] | None,
+) -> None:
+    if not qr_output:
+        return
+
+    output_path = _write_qr_image(qr_url, qr_output)
+    _emit_status(on_status, f"QR image: {output_path}")
+
+
 def _ensure_camoufox_ready() -> None:
     """Validate that the Camoufox package and browser binary are available."""
     try:
@@ -381,6 +413,7 @@ def _browser_assisted_qrcode_login(
     on_status: callable[[str], None] | None = None,
     timeout_s: int = POLL_TIMEOUT_S,
     print_link: bool = False,
+    qr_output: str | Path | None = None,
 ) -> dict[str, str]:
     """Log in by letting a real browser complete the QR flow, then export cookies."""
     _ensure_camoufox_ready()
@@ -437,6 +470,7 @@ def _browser_assisted_qrcode_login(
 
         _emit_status(on_status, "\n📱 Scan the QR code below with the Xiaohongshu app:\n")
         rendered = _display_qr_in_terminal(qr_url)
+        _write_qr_output_if_requested(qr_url=qr_url, qr_output=qr_output, on_status=on_status)
         if not rendered:
             _emit_status(on_status, "⚠️  Install 'qrcode' for terminal rendering: pip install qrcode")
         if print_link or not rendered:
@@ -494,6 +528,7 @@ def _http_qrcode_login(
     on_status: callable[[str], None] | None = None,
     timeout_s: int = POLL_TIMEOUT_S,
     print_link: bool = False,
+    qr_output: str | Path | None = None,
 ) -> dict[str, str]:
     """Run the legacy pure-HTTP QR login flow."""
     a1 = _generate_a1()
@@ -523,6 +558,7 @@ def _http_qrcode_login(
 
         _emit_status(on_status, "\n📱 Scan the QR code below with the Xiaohongshu app:\n")
         rendered = _display_qr_in_terminal(qr_url)
+        _write_qr_output_if_requested(qr_url=qr_url, qr_output=qr_output, on_status=on_status)
         if not rendered:
             _emit_status(on_status, "⚠️  Install 'qrcode' for terminal rendering: pip install qrcode")
         if print_link or not rendered:
@@ -590,6 +626,7 @@ def qrcode_login(
     timeout_s: int = POLL_TIMEOUT_S,
     prefer_browser_assisted: bool = False,
     print_link: bool = False,
+    qr_output: str | Path | None = None,
 ) -> dict[str, str]:
     """Run the QR code login flow."""
     if prefer_browser_assisted:
@@ -598,8 +635,14 @@ def qrcode_login(
                 on_status=on_status,
                 timeout_s=timeout_s,
                 print_link=print_link,
+                qr_output=qr_output,
             )
         except BrowserQrLoginUnavailable as exc:
             logger.info("Browser-assisted QR login unavailable, falling back to HTTP flow: %s", exc)
 
-    return _http_qrcode_login(on_status=on_status, timeout_s=timeout_s, print_link=print_link)
+    return _http_qrcode_login(
+        on_status=on_status,
+        timeout_s=timeout_s,
+        print_link=print_link,
+        qr_output=qr_output,
+    )

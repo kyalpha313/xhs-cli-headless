@@ -19,25 +19,25 @@ def test_update_help_is_registered():
 
 
 def test_update_check_json_reports_current_and_latest(monkeypatch):
-    monkeypatch.setattr("xhs_cli.commands.update.fetch_latest_version", lambda source: "0.8.9")
+    monkeypatch.setattr("xhs_cli.commands.update.fetch_latest_version", lambda source: "0.9.0")
 
     result = runner.invoke(cli, ["update", "--check", "--json"])
 
     assert result.exit_code == 0
-    assert '"current_version": "0.8.8"' in result.output
-    assert '"latest_version": "0.8.9"' in result.output
+    assert '"current_version": "0.8.9"' in result.output
+    assert '"latest_version": "0.9.0"' in result.output
     assert '"update_available": true' in result.output
 
 
 def test_update_check_does_not_treat_older_latest_as_update(monkeypatch):
-    monkeypatch.setattr("xhs_cli.commands.update.__version__", "0.8.8")
-    monkeypatch.setattr("xhs_cli.commands.update.fetch_latest_version", lambda source: "0.8.7")
+    monkeypatch.setattr("xhs_cli.commands.update.__version__", "0.8.9")
+    monkeypatch.setattr("xhs_cli.commands.update.fetch_latest_version", lambda source: "0.8.8")
 
     result = runner.invoke(cli, ["update", "--check", "--json"])
 
     assert result.exit_code == 0
-    assert '"current_version": "0.8.8"' in result.output
-    assert '"latest_version": "0.8.7"' in result.output
+    assert '"current_version": "0.8.9"' in result.output
+    assert '"latest_version": "0.8.8"' in result.output
     assert '"update_available": false' in result.output
 
 

@@ -27,6 +27,9 @@ def test_auth_skill_documents_session_recovery_flow():
 
     assert "xhs auth doctor --json" in text
     assert "xhs login" in text
+    assert "xhs login --qr-output" in text
+    assert "QR URL" in text
+    assert "QR image" in text
     assert "xhs auth import --file" in text
     assert "xhs auth import-fields --interactive" in text
 
@@ -38,7 +41,7 @@ def test_safety_rules_block_unstable_commands_by_default():
         assert command in text
 
 
-def test_project_version_is_087():
+def test_project_version_is_089():
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
 
-    assert 'version = "0.8.8"' in pyproject
+    assert 'version = "0.8.9"' in pyproject

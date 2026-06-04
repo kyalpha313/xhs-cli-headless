@@ -11,6 +11,7 @@
 | 登录排障 | `xhs auth doctor --json` |
 | 查看本地 cookie 字段状态 | `xhs auth inspect --json` |
 | 首次登录或重新登录 | `xhs login` |
+| 聊天渠道扫码登录 | `xhs login --qr-output outputs/xhs-login-qr.png`，把 `QR URL` 和 `QR image` PNG 同时发给用户 |
 | 导入 cookies 文件 | `xhs auth import --file <file> --json` |
 | 交互式导入字段 | `xhs auth import-fields --interactive` |
 | 退出登录 | `xhs logout --json` |
@@ -58,4 +59,4 @@
 - 评论区观点整理：`read -> comments -> summarize`
 - board 内容整理：`board -> summarize`
 - 公开视频短链解析：`read <xhslink.com_url>`，短链展开和 HTML fallback 成功前不要求登录
-- 登录恢复：非公开读取命令失败后再走 `auth doctor -> login` 或 `auth import`
+- 登录恢复：非公开读取命令失败后再走 `auth doctor -> login` 或 `auth import`；聊天渠道登录必须发链接和二维码图片

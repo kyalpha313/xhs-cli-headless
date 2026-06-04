@@ -260,6 +260,41 @@ def test_qrcode_login_prints_link_when_requested(monkeypatch):
     assert any("QR URL: https://example.com/qr" in message for message in messages)
 
 
+def test_qrcode_login_writes_qr_output_and_reports_path(monkeypatch, tmp_path):
+    messages = []
+    writes = []
+    output = tmp_path / "login-qr.png"
+
+    monkeypatch.setattr("xhs_cli.qr_login.XhsClient", _FakeQrClient)
+    monkeypatch.setattr("xhs_cli.qr_login._generate_a1", lambda: "a1-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._generate_webid", lambda: "webid-fixed")
+    monkeypatch.setattr("xhs_cli.qr_login._display_qr_in_terminal", lambda data: True)
+
+    def fake_write_qr_image(data, path):
+        writes.append((data, path))
+        return output
+
+    monkeypatch.setattr("xhs_cli.qr_login._write_qr_image", fake_write_qr_image)
+    monkeypatch.setattr("xhs_cli.qr_login.time.sleep", lambda seconds: None)
+    monkeypatch.setattr("xhs_cli.qr_login.save_cookies", lambda cookies: None)
+
+    qrcode_login(timeout_s=1, qr_output=str(output), on_status=messages.append)
+
+    assert writes == [("https://example.com/qr", str(output))]
+    assert any(f"QR image: {output}" in message for message in messages)
+
+
+def test_write_qr_image_creates_png(tmp_path):
+    from xhs_cli.qr_login import _write_qr_image
+
+    output = tmp_path / "login-qr.png"
+
+    written = _write_qr_image("https://example.com/qr", output)
+
+    assert written == output
+    assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
 def test_qrcode_login_uses_finalizing_status_after_confirmation(monkeypatch):
     messages = []
 

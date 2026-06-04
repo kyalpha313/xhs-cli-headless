@@ -8,7 +8,7 @@
 - 用稳定命令读取、搜索和整理小红书内容
 - 把 CLI 与 Agent skill 一起发布，安装一个包即可同时获得程序和使用指南
 
-当前版本：`0.8.8`
+当前版本：`0.8.9`
 
 ## 适合谁用
 
@@ -85,6 +85,9 @@ xhs auth doctor --json
 # 2. 首次登录或会话过期，走二维码登录
 xhs login
 
+# 聊天渠道中需要把二维码图片发给用户时
+xhs login --qr-output outputs/xhs-login-qr.png
+
 # 3. 如果用户已有 cookies 文件
 xhs auth import --file cookies.json --json
 
@@ -99,6 +102,8 @@ xhs status --json
 
 结构化错误会带 `details.steps`，Agent 可以直接按步骤引导用户完成恢复。
 
+如果 Agent 运行在飞书、微信等聊天渠道，使用 `xhs login --qr-output outputs/xhs-login-qr.png`。命令会输出 `QR URL: ...` 和 `QR image: ...`；Agent 必须把原始链接和 PNG 二维码图片同时发给用户，不要只发链接。
+
 ## 支持能力
 
 ### 认证与会话
@@ -106,6 +111,7 @@ xhs status --json
 | 命令 | 说明 |
 | --- | --- |
 | `xhs login` | 默认 headless 二维码登录 |
+| `xhs login --qr-output <png>` | 输出二维码 PNG，适合飞书 / 微信等聊天渠道 |
 | `xhs login --qrcode-http` | 显式使用纯 HTTP 二维码登录 |
 | `xhs status` | 检查当前登录态 |
 | `xhs whoami` | 查看当前账号 |

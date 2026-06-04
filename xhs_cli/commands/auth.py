@@ -392,6 +392,8 @@ def auth():
               help="Use the pure-HTTP QR login flow explicitly (same backend as default xhs login)")
 @click.option("--print-link", is_flag=True, default=False,
               help="Print the QR login URL in addition to terminal QR rendering")
+@click.option("--qr-output", type=click.Path(dir_okay=False, writable=True),
+              help="Write the QR code to a PNG file for chat or remote login flows")
 @click.pass_context
 def login(
     ctx,
@@ -402,6 +404,7 @@ def login(
     use_qrcode: bool,
     use_qrcode_http: bool,
     print_link: bool,
+    qr_output: str | None,
 ):
     """Log in with headless QR by default."""
 
@@ -414,6 +417,9 @@ def login(
     if print_link and use_browser:
         raise click.UsageError("--print-link cannot be used with --browser.")
 
+    if qr_output and use_browser:
+        raise click.UsageError("--qr-output cannot be used with --browser.")
+
     if not use_browser:
         def _login_with_qrcode() -> None:
             from ..qr_login import qrcode_login
@@ -423,6 +429,7 @@ def login(
             cookies = qrcode_login(
                 prefer_browser_assisted=prefer_browser_assisted,
                 print_link=effective_print_link,
+                qr_output=qr_output,
                 on_status=_qr_status,
             )
 

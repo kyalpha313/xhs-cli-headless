@@ -37,10 +37,11 @@ FAKE_NOTE_RESPONSE = {
 
 
 def _assert_qrcode_kwargs(expected_print_link: bool, **kwargs):
-    assert kwargs.keys() == {"prefer_browser_assisted", "print_link", "on_status"}
+    assert kwargs.keys() == {"prefer_browser_assisted", "print_link", "on_status", "qr_output"}
     assert kwargs["prefer_browser_assisted"] is False
     assert kwargs["print_link"] is expected_print_link
     assert callable(kwargs["on_status"])
+    assert kwargs["qr_output"] is None
     return {
         "a1": "a1-http",
         "webId": "webid-http",
@@ -82,6 +83,7 @@ class TestCliBasic:
         assert result.exit_code == 0
         assert "--qrcode-http" in result.output
         assert "--print-link" in result.output
+        assert "--qr-output" in result.output
         assert "--browser" not in result.output
 
     def test_auth_help(self):
@@ -536,6 +538,48 @@ class TestCliBasic:
         assert payload["data"]["authenticated"] is True
         assert payload["data"]["user"]["username"] == "alice001"
 
+    def test_login_qr_output_is_passed_to_qr_flow(self, monkeypatch, tmp_path):
+        qr_output = tmp_path / "login-qr.png"
+        seen = {}
+
+        def fake_qr(**kwargs):
+            seen.update(kwargs)
+            return {
+                "a1": "a1-http",
+                "webId": "webid-http",
+                "web_session": "session-http",
+            }
+
+        monkeypatch.setattr("xhs_cli.qr_login.qrcode_login", fake_qr)
+
+        class FakeClient:
+            def __init__(self, cookies):
+                self.cookies = cookies
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def get_self_info(self):
+                return {
+                    "guest": False,
+                    "basic_info": {
+                        "user_id": "u-1",
+                        "nickname": "Alice",
+                        "red_id": "alice001",
+                    },
+                }
+
+        monkeypatch.setattr("xhs_cli.commands.auth.XhsClient", FakeClient)
+
+        result = runner.invoke(cli, ["login", "--qr-output", str(qr_output), "--yaml"])
+
+        assert result.exit_code == 0
+        assert seen["qr_output"] == str(qr_output)
+        assert seen["print_link"] is True
+
     def test_login_browser_invalid_session_points_to_qrcode_http(self, monkeypatch):
         monkeypatch.setattr(
             "xhs_cli.commands.auth.get_cookies",
@@ -654,6 +698,12 @@ class TestCliBasic:
 
         assert result.exit_code != 0
         assert "--print-link cannot be used with --browser." in result.output
+
+    def test_login_qr_output_rejected_with_browser(self):
+        result = runner.invoke(cli, ["login", "--browser", "--qr-output", "login.png"])
+
+        assert result.exit_code != 0
+        assert "--qr-output cannot be used with --browser." in result.output
 
     def test_hot_help(self):
         result = runner.invoke(cli, ["hot", "--help"])

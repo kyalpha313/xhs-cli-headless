@@ -13,6 +13,7 @@
 ## 支持命令
 
 - `xhs login`
+- `xhs login --qr-output <png>`
 - `xhs login --qrcode-http`
 - `xhs status --json`
 - `xhs whoami --json`
@@ -35,6 +36,23 @@
 5. 恢复后运行 `xhs status --json` 验证。
 
 不要在会话失效时反复重试业务命令。
+
+## 聊天渠道登录
+
+如果当前是在飞书、微信等聊天渠道里帮用户登录，不要只转发 `QR URL`。终端里的字符二维码通常不会作为可扫码图片进入聊天消息。
+
+使用：
+
+```bash
+xhs login --qr-output outputs/xhs-login-qr.png
+```
+
+当命令输出 `QR URL: ...` 和 `QR image: outputs/xhs-login-qr.png` 后，必须同时发给用户：
+
+- 原始登录链接：不要改写、不要重新编码。
+- 二维码图片：发送 `QR image` 指向的 PNG 文件。
+
+飞书渠道可用 `lark-cli im +messages-send --chat-id <oc_xxx> --image ./xhs-login-qr.png` 发送图片；注意 `lark-cli` 的本地图片参数必须是当前目录内的相对路径。微信渠道也要按对应渠道的图片发送能力发送这张 PNG。随后保持 `xhs login` 进程等待用户扫码确认，用户确认后再运行 `xhs status --json` 验证。
 
 ## 输出要求
 

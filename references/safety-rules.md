@@ -39,6 +39,8 @@
 3. 如果用户已有 cookies 文件，使用 `xhs auth import --file <file>`。
 4. 如果用户只能从浏览器复制字段，使用 `xhs auth import-fields --interactive`。
 
+聊天渠道登录恢复：如果用户通过飞书、微信等渠道交互，执行 `xhs login --qr-output outputs/xhs-login-qr.png`，并同时发送 `QR URL` 原始链接和 `QR image` 指向的 PNG 二维码。不要只发链接；终端字符二维码通常不会进入聊天消息。
+
 ## 禁止默认尝试
 
 - 不默认调用 `post`。
