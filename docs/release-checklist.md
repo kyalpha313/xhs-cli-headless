@@ -2,6 +2,14 @@
 
 This checklist is for the current `xhs-cli-headless` CLI release process.
 
+Release invariant: every public version bump must be published to both channels in the same release pass:
+
+- GitHub: push the release commit, create/push the matching `vX.Y.Z` tag, and ensure the GitHub release has artifacts.
+- PyPI: publish the same version so default `xhs update` can discover it from PyPI.
+- Verification: after publishing, run `xhs update --check --json` from an older installed version and confirm `latest_version` is the new version.
+
+Do not treat a `main` push alone as a completed release. If a version exists only on GitHub source, document it as an unreleased/source-only build and tell users to use `xhs update --source github`.
+
 ## A. Repository Files
 
 These items should live in the repository and be versioned:
